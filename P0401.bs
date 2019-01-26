@@ -1,0 +1,227 @@
+<pre class='metadata'>
+Title: Providing size feedback in the Allocator interface
+Status: D
+Shortname: D0401
+Group: WG21
+Revision: 1
+Editor: Jonathan Wakely, cxx@kayari.org
+Editor: Chris Kennelly, Google, ckennelly@google.com
+Date: 2019-01-26
+Audience: LEWG
+Audience: LWG
+Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
+URL: http://wg21.link/P0401R1
+Markup Shorthands: markdown yes
+Default Highlight: C++
+</pre>
+
+# Motivation # {#motivation}
+
+Consider code adding elements to `vector`:
+
+<xmp>
+std::vector<int> v = {1, 2, 3};
+// Expected: v.capacity() == 3
+
+// Add an additional element, triggering a reallocation.
+v.push_back(4);
+</xmp>
+
+Many allocators only allocate in fixed-sized chunks of memory, rounding up
+requests.  Our underlying heap allocator received a request for 12 bytes (`3 *
+sizeof(int`) while constructing `v`.  For several implementations, this request
+is turned into a 16 byte region.
+
+## Why not `realloc` ## {#reallocation}
+
+`realloc` poses several problems problems:
+
+*   We have unclear strategies for growing a container.  Consider the two
+    options (`a` and `b`) outlined in the comments of the example below.
+    Assume, as with the [[#motivation]] example, that there is a 16 byte size
+    class for our underlying allocator.
+
+    <xmp>
+    std::vector<int> v = {1, 2, 3};
+    // Expected: v.capacity() == 3
+
+    // Add an additional element.  Does the vector:
+    // a) realloc(sizeof(int) * 4), adding a single element
+    // b) realloc(sizeof(int) * 6), attempt to double, needing reallocation
+    v.push_back(4);
+
+    // Add another element.
+    // a) realloc(sizeof(int) * 5), fails in-place, requires reallocation
+    // b) size + 1 <= capacity, no reallocation required
+    v.push_back(5);
+    </xmp>
+
+    Option `a` requires every append (after the initial allocation) try to
+    `realloc`, requiring an interaction with the allocator each time.
+
+    Option `b` requires guesswork to probe the allocator's true size.  By
+    doubling (the typical growth pattern for `std::vector` in libc++ and
+    libstdc++), we skip past the existing allocation's size boundary.  While we
+    can use a reduced growth rate, doing so requires more interactions with the
+    allocator (calls to `realloc`), as well as copies (when we cannot resize
+    in-place).
+
+    Both of these options add extra branching on the control flow for growing
+    the buffer.
+
+*   When the allocator cannot resize the buffer in-place, it allocates new
+    memory and `memcpy`'s the contents.  For non-trivially copyable types, this
+    is disastrous.  The *language* lacks support for reallocating in-place
+    *without* moving.  While this function could be implemented as magic
+    library function, it could not interact with many underlying `malloc`
+    implementations (libc, in the case of libc++ and libstdc++) used to build
+    `operator new`, nor could it interact with user-provided replacement
+    functions.
+
+    In-place reallocation has been considered in [[N3495]] (throwing
+    `std::bad_alloc` when unable) and [[P0894R1]] (returning `false` when
+    unable).
+
+For fixed-size allocators it makes more sense, and is much simpler for
+containers to adapt to, if the allocator is able to over-allocate on the
+initial request and inform the caller how much memory was made available.
+
+# Proposal # {#proposal}
+
+Wording relative to [[N4800]].
+
+We propose an optional extension to allocator to return the allocation size.
+
+<blockquote>
+Table 34 - Cpp17Allocator Requirements
+
+<table>
+<tr>
+<td>`a.allocate(n)`</td>
+<td>`X::pointer`</td>
+<td>Memory is allocated for `n` objects of type `T` but objects are not constructed. `allocate` may throw an appropriate exception. [ Note: If `n == 0`, the return value is unspecified. — end note ]</td>
+<td></td>
+</tr>
+
+<tr>
+<td><ins>`a.allocate_with_size(n)`</ins>
+<td><ins>`std::pair<X::pointer, X::size_type>`</ins>
+<td><ins>Memory is allocated for at least `n` objects of type `T` but objects are not constructed and returned as the first value.  The actual number of objects `m`, such that `m>=n`, that memory has been allocated for is returned in the second value.  `allocate` may throw an appropriate exception. [ Note: If `n == 0`, the return value is unspecified. — end note ]</ins>
+</td>
+<td>
+<ins>`{a.allocate(n), n}`</ins>
+<td>
+</tr>
+
+<tr>
+<td><ins>`a.allocate_with_size(n, y)`</ins>
+<td><ins>`std::pair<X::pointer, X::size_type>`</ins>
+<td><ins>Memory is allocated for at least `n` objects of type `T` but objects are not constructed and returned as the first value.  The actual number of objects `m`, such that `m>=n`, that memory has been allocated for is returned in the second value.  `allocate` may throw an appropriate exception.  The use of `y` is unspecified, but is intended as a hint to aid locality. [ Note: If `n == 0`, the return value is unspecified. — end note ]</ins>
+</td>
+<td>
+<ins>`{a.allocate(n), n}`</ins>
+<td>
+</tr>
+
+
+
+<tr>
+<td>`a.deallocate(p,n)`</td>
+<td>(not used)</td>
+<td>*Requires*: `p` shall be a value returned by an earlier call to `allocate`<ins> or `allocate_with_size`</ins> that has not been invalidated by an intervening call to `deallocate`. <ins>If this memory was obtained by a call to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain this memory.  <ins>Otherwise, `n` shall match the value returned by `allocate_with_size` to obtain this memory.</ins>
+
+*Throws*: Nothing.
+</td>
+<td></td>
+</tr>
+</table>
+</blockquote>
+
+Amend [allocator.traits]:
+
+<blockquote>
+<pre>
+namespace std {
+  template<class Alloc> struct allocator_traits {
+    ...
+    [[nodiscard]] static pointer allocate(Alloc& a, size_type n);
+    [[nodiscard]] static pointer allocate(Alloc& a, size_type n, const_void_pointer hint);
+    <ins>
+    [[nodiscard]] static std::pair<pointer, size_type> allocate_with_size(Alloc& a, size_type n);
+    [[nodiscard]] static std::pair<pointer, size_type> allocate_with_size(Alloc& a, size_type n, const_void_pointer hint);
+    </ins>
+    ...
+  };
+}
+</pre>
+</blockquote>
+
+Amend [allocator.traits.members]:
+
+<blockquote>
+<pre>[[nodiscard]] static pointer allocate(Alloc& a, size_type n);</pre>
+
+*    *Returns*: `a.allocate(n)`
+
+<pre>[[nodiscard]] static pointer allocate(Alloc& a, size_type n, const_void_pointer hint);</pre>
+
+*    *Returns*: `a.allocate(n, hint)` if that expression is well-formed;
+     otherwise, `a.allocate(n)`.
+
+<ins>
+<pre>[[nodiscard]] static std::pair<pointer, size_type> allocate_with_size(Alloc& a, size_type n);</pre>
+
+*    *Returns*: `a.allocate_with_size(n)` if that expression is well-formed, otherwise, `{a.allocate(n), n}`
+
+<pre>[[nodiscard]] static pointer allocate(Alloc& a, size_type n, const_void_pointer hint);</pre>
+
+*    *Returns*: `a.allocate_with_size(n, hint)` if that expression is
+     well-formed; otherwise, `a.allocate_with_size(n)` if that expression is
+     well-formed: otherwise, `{a.allocate(n), n}`.
+
+</ins>
+</blockquote>
+
+# Design Considerations # {#design}
+
+## `allocate` selection ## {#overloads}
+
+There are multiple approaches here:
+
+*   Return a pointer-size pair, as presented.
+*   Overload `allocate` and return via a reference parameter.  This potentially
+    hampers optimization depending on ABI, as the value is returned via memory
+    rather than a register.
+
+## `deallocate` changes ## {#deallocate}
+
+We now require flexibility on the size we pass to `deallocate`.  For container
+types using this allocator interface, they are faced with the choice of storing
+*both* the original size request as well as the provided size (requiring
+additional auxillary storage), or being unable to reproduce one during the call
+to `deallocate`.
+
+As the true size is expected to be useful for the `capacity` of a `string` or
+`vector` instance, the returned size is available without additional storage
+requirements.  The original (requested) size is unavailable, so we relax the
+`deallocate` size parameter requirements for these allocations.
+
+## Interaction with `polymorphic_allocator` ## {#pmr}
+
+`std::pmr::memory_resource` is implemented using virtual functions.  Adding new
+methods, such as the proposed allocate API would require taking an ABI break.
+
+<pre class=biblio>
+{
+    "P0894R1": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0894r1.md",
+	"date": "2019-01-18",
+	"title": "realloc for C++"
+    },
+    "N4800": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4800.pdf",
+	"date": "2019-01-21",
+	"title": "Working Draft, Standard for Programming Language C++"
+    }
+}
+</pre>
