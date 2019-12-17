@@ -1,16 +1,16 @@
 <pre class='metadata'>
 Title: Providing size feedback in the Allocator interface
-Status: P
+Status: D
 Shortname: P0401
 Group: WG21
-Revision: 1
+Revision: 2
 Editor: Jonathan Wakely, cxx@kayari.org
 Editor: Chris Kennelly, Google, ckennelly@google.com
-Date: 2019-06-11
+Date: 2019-10-06
 Audience: LEWG
 Audience: LWG
 Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
-URL: http://wg21.link/P0401R1
+URL: http://wg21.link/P0401R2
 Markup Shorthands: markdown yes
 Default Highlight: C++
 </pre>
@@ -19,7 +19,7 @@ Default Highlight: C++
 
 This is a library paper to describe how size feedback can be used with allocators:
 *   In the case of `std::allocator`, the language feature proposed in
-    [[P0901R3]] could be used.
+    [[P0901R4]] could be used.
 *   In the case of custom allocators, the availability of the traits  interface
     allows standard library containers to leverage this functionality.
 
@@ -88,106 +88,77 @@ is turned into a 16 byte region.
 
     In-place reallocation has been considered in [[N3495]] (throwing
     `std::bad_alloc` when unable) and [[P0894R1]] (returning `false` when
-    unable).
+    unable).  This has sometimes been referred to as an "extend" or an "expand"
+    interface.  Extending an existing allocation requires a round-trip to the
+    allocator (and its requisite branch/call overheads) to determine whether
+    the allocation *could* be expanded.  As discussed previously, we need to
+    probe for the true size of the backing object (until we find extend fails)
+    until we give up and apply a multiplicative expansion factor.
 
 For fixed-size allocators it makes more sense, and is much simpler for
 containers to adapt to, if the allocator is able to over-allocate on the
 initial request and inform the caller how much memory was made available.
 
+## Why not ask the allocator for the size ## {#size}
+
+We could also explore APIs that answer the question: "If I ask for `N` bytes,
+how many do I actually get?"  [[jemalloc]] calls this `nallocx`.
+
+*   `nallocx` requires an extra call / size calculation.  This requires we
+    duplicate work, as the size calculation is performed as part of allocation
+    itself.
+*   `nallocx` impairs telemetry for monitoring allocation request sizes.  If a
+    `nallocx` return value is cached, the user appears to be asking for exactly
+    as many bytes as `nallocx` said they would get.
+
+See also [[P0901R4]]'s discussion "`nallocx`: not as awesome as it looks."
+
 # Proposal # {#proposal}
 
 Wording relative to [[N4800]].
 
-We propose an optional extension to allocator to return the allocation size.
+We propose a free function to return the allocation size simultaneously with an
+allocation.
 
 <blockquote>
+
+Amend [allocator.requirements]:
+
+<ins>
+<pre>
+template&lt;typename T = void&gt;
+struct sized_ptr_t {
+  T *ptr;
+  size_t n;
+};
+
+template<typename T, typename Allocator = std::allocator<T>>
+sized_ptr_t<T> allocate_at_least(Allocator& a, size_t n);
+</pre>
+</ins>
+
+<ol start="8">
+   <li><ins>*Effects:* Let `s` be the result of `allocate_at_least(a, n)`.
+   Memory is allocated for at least `n` objects of type `T` but objects are not
+   constructed.  A pointer to that memory is returned as `s.ptr`.  The actual
+   number of objects `m`, such that `m>=n`, that memory has been allocated for
+   is returned as `s.n`.</ins></li>
+   <li><ins>*Remarks:* If `n=0`, the return value is unspecified.</ins></li>
+</ol>
+
 Table 34 - Cpp17Allocator Requirements
 
 <table>
 <tr>
-<td>`a.allocate(n)`</td>
-<td>`X::pointer`</td>
-<td>Memory is allocated for `n` objects of type `T` but objects are not constructed. `allocate` may throw an appropriate exception. [ Note: If `n == 0`, the return value is unspecified. — end note ]</td>
-<td></td>
-</tr>
-
-<tr>
-<td><ins>`a.allocate_with_size(n)`</ins>
-<td><ins>`std::pair<X::pointer, X::size_type>`</ins>
-<td><ins>Memory is allocated for at least `n` objects of type `T` but objects are not constructed and returned as the first value.  The actual number of objects `m`, such that `m>=n`, that memory has been allocated for is returned in the second value.  `allocate` may throw an appropriate exception. [ Note: If `n == 0`, the return value is unspecified. — end note ]</ins>
-</td>
-<td>
-<ins>`{a.allocate(n), n}`</ins>
-<td>
-</tr>
-
-<tr>
-<td><ins>`a.allocate_with_size(n, y)`</ins>
-<td><ins>`std::pair<X::pointer, X::size_type>`</ins>
-<td><ins>Memory is allocated for at least `n` objects of type `T` but objects are not constructed and returned as the first value.  The actual number of objects `m`, such that `m>=n`, that memory has been allocated for is returned in the second value.  `allocate` may throw an appropriate exception.  The use of `y` is unspecified, but is intended as a hint to aid locality. [ Note: If `n == 0`, the return value is unspecified. — end note ]</ins>
-</td>
-<td>
-<ins>`{a.allocate(n), n}`</ins>
-<td>
-</tr>
-
-
-
-<tr>
 <td>`a.deallocate(p,n)`</td>
 <td>(not used)</td>
-<td>*Requires*: `p` shall be a value returned by an earlier call to `allocate`<ins> or `allocate_with_size`</ins> that has not been invalidated by an intervening call to `deallocate`. <ins>If this memory was obtained by a call to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain this memory.  <ins>Otherwise, `n` shall match the value returned by `allocate_with_size` to obtain this memory.</ins>
+<td>*Requires*: `p` shall be a value returned by an earlier call to `allocate`<ins> or `allocate_at_least`</ins> that has not been invalidated by an intervening call to `deallocate`. <ins>If this memory was obtained by a call to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain this memory.  <ins>Otherwise, `n` shall match the value returned by `allocate_at_least` to obtain this memory.</ins>
 
 *Throws*: Nothing.
 </td>
 <td></td>
 </tr>
 </table>
-</blockquote>
-
-Amend [allocator.traits]:
-
-<blockquote>
-<pre>
-namespace std {
-  template<class Alloc> struct allocator_traits {
-    ...
-    [[nodiscard]] static pointer allocate(Alloc& a, size_type n);
-    [[nodiscard]] static pointer allocate(Alloc& a, size_type n, const_void_pointer hint);
-    <ins>
-    [[nodiscard]] static std::pair<pointer, size_type> allocate_with_size(Alloc& a, size_type n);
-    [[nodiscard]] static std::pair<pointer, size_type> allocate_with_size(Alloc& a, size_type n, const_void_pointer hint);
-    </ins>
-    ...
-  };
-}
-</pre>
-</blockquote>
-
-Amend [allocator.traits.members]:
-
-<blockquote>
-<pre>[[nodiscard]] static pointer allocate(Alloc& a, size_type n);</pre>
-
-*    *Returns*: `a.allocate(n)`
-
-<pre>[[nodiscard]] static pointer allocate(Alloc& a, size_type n, const_void_pointer hint);</pre>
-
-*    *Returns*: `a.allocate(n, hint)` if that expression is well-formed;
-     otherwise, `a.allocate(n)`.
-
-<ins>
-<pre>[[nodiscard]] static std::pair<pointer, size_type> allocate_with_size(Alloc& a, size_type n);</pre>
-
-*    *Returns*: `a.allocate_with_size(n)` if that expression is well-formed, otherwise, `{a.allocate(n), n}`
-
-<pre>[[nodiscard]] static pointer allocate(Alloc& a, size_type n, const_void_pointer hint);</pre>
-
-*    *Returns*: `a.allocate_with_size(n, hint)` if that expression is
-     well-formed; otherwise, `a.allocate_with_size(n)` if that expression is
-     well-formed: otherwise, `{a.allocate(n), n}`.
-
-</ins>
 </blockquote>
 
 # Design Considerations # {#design}
@@ -219,22 +190,68 @@ requirements.  The original (requested) size is unavailable, so we relax the
 `std::pmr::memory_resource` is implemented using virtual functions.  Adding new
 methods, such as the proposed allocate API would require taking an ABI break.
 
+# Revision History # {#revisions}
+
+## R1 &rarr; R2 ## {#R2}
+
+Applied LEWG feedback from [[Cologne]].
+
+<blockquote>
+Poll: We want a feature like this.
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>2</td><td>9</td><td>2</td><td>0</td><td>0</td></tr>
+</table>
+</blockquote>
+
+*   As users may specialize `std::allocator_traits`, this revision moves to a
+    free function `std::allocate_at_least` as suggested via a LEWG poll.
+
+<blockquote>
+Poll: Name choice
+
+<table>
+<tr><td> 5</td><td>`allocate_with_size`</td></tr>
+<tr><td> 4</td><td>`overallocate`</td></tr>
+<tr><td> 2</td><td>`allocate_with_oversubscribe`</td></tr>
+<tr><td> 6</td><td>`allocate_oversize`</td></tr>
+<tr><td>14</td><td>`allocate_at_least`</td></tr>
+</table>
+
+Poll: Prefer a struct rather than a requirement of structured bindings.
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>2</td><td>8</td><td>0</td><td>2</td><td>1</td></tr>
+</table>
+</blockquote>
+
 <pre class=biblio>
 {
+    "Cologne": {
+        "href": "http://wiki.edg.com/bin/view/Wg21cologne2019/P0401",
+	"date": "2019-07-17",
+	"title": "Cologne Meeting Minutes"
+    },
     "P0894R1": {
         "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0894r1.md",
 	"date": "2019-01-18",
 	"title": "realloc for C++"
     },
-    "P0901R3": {
-        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0901r3.html",
-	"date": "2019-01-21",
+    "P0901R4": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0901r4.html",
+	"date": "2019-06-11",
 	"title": "Size feedback in operator new"
     },
     "N4800": {
         "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4800.pdf",
 	"date": "2019-01-21",
 	"title": "Working Draft, Standard for Programming Language C++"
+    },
+    "jemalloc": {
+        "title": "jemalloc(3) - Linux man page",
+        "href": "http://jemalloc.net/jemalloc.3.html"
     }
 }
 </pre>
