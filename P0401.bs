@@ -19,7 +19,7 @@ Default Highlight: C++
 
 This is a library paper to describe how size feedback can be used with allocators:
 *   In the case of `std::allocator`, the language feature proposed in
-    [[P0901R4]] could be used.
+    [[P0901R5]] could be used.
 *   In the case of custom allocators, the availability of the traits  interface
     allows standard library containers to leverage this functionality.
 
@@ -111,7 +111,7 @@ how many do I actually get?"  [[jemalloc]] calls this `nallocx`.
     `nallocx` return value is cached, the user appears to be asking for exactly
     as many bytes as `nallocx` said they would get.
 
-See also [[P0901R4]]'s discussion "`nallocx`: not as awesome as it looks."
+See also [[P0901R5]]'s discussion "`nallocx`: not as awesome as it looks."
 
 # Proposal # {#proposal}
 
@@ -239,9 +239,9 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
 	"date": "2019-01-18",
 	"title": "realloc for C++"
     },
-    "P0901R4": {
-        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0901r4.html",
-	"date": "2019-06-11",
+    "P0901R5": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0901r5.html",
+	"date": "2019-10-03",
 	"title": "Size feedback in operator new"
     },
     "N4800": {
