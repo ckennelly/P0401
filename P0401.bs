@@ -152,7 +152,12 @@ Table 34 - Cpp17Allocator Requirements
 <tr>
 <td>`a.deallocate(p,n)`</td>
 <td>(not used)</td>
-<td>*Requires*: `p` shall be a value returned by an earlier call to `allocate`<ins> or `allocate_at_least`</ins> that has not been invalidated by an intervening call to `deallocate`. <ins>If this memory was obtained by a call to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain this memory.  <ins>Otherwise, `n` shall match the value returned by `allocate_at_least` to obtain this memory.</ins>
+<td>*Requires*: `p` shall be a value returned by an earlier call to
+`allocate`<ins> or `allocate_at_least`</ins> that has not been invalidated by
+an intervening call to `deallocate`. <ins>If this memory was obtained by a call
+to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain
+this memory.  <ins>Otherwise, `n` shall satisfy `capacity >= n >= requested` where
+`[p, capacity] = allocate_at_least(requested)` was used to obtain this memory.</ins>
 
 *Throws*: Nothing.
 </td>
