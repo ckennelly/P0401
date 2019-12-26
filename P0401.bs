@@ -132,19 +132,19 @@ struct sized_ptr_t {
   size_t n;
 };
 
-template<typename T, typename Allocator = std::allocator<T>>
-sized_ptr_t<T> allocate_at_least(Allocator& a, size_t n);
+template&lt;typename T, typename Allocator = std::allocator&lt;T&gt;&gt;
+sized_ptr_t&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
 </pre>
 </ins>
 
-<ol start="8">
+<ul>
    <li><ins>*Effects:* Let `s` be the result of `allocate_at_least(a, n)`.
    Memory is allocated for at least `n` objects of type `T` but objects are not
    constructed.  A pointer to that memory is returned as `s.ptr`.  The actual
    number of objects `m`, such that `m>=n`, that memory has been allocated for
    is returned as `s.n`.</ins></li>
    <li><ins>*Remarks:* If `n=0`, the return value is unspecified.</ins></li>
-</ol>
+</ul>
 
 Table 34 - Cpp17Allocator Requirements
 
