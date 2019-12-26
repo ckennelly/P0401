@@ -143,7 +143,7 @@ sized_ptr_t&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
    constructed.  A pointer to that memory is returned as `s.ptr`.  The actual
    number of objects `m`, such that `m>=n`, that memory has been allocated for
    is returned as `s.n`.</ins></li>
-   <li><ins>*Remarks:* If `n=0`, the return value is unspecified.</ins></li>
+   <li><ins>[ *Note:* If `n=0`, the value of `s.ptr` is unspecified. -- end note]</ins></li>
 </ul>
 
 Table 34 - Cpp17Allocator Requirements
