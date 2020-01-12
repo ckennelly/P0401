@@ -37,7 +37,7 @@ v.push_back(4);
 
 Many allocators only allocate in fixed-sized chunks of memory, rounding up
 requests.  Our underlying heap allocator received a request for 12 bytes (`3 *
-sizeof(int`) while constructing `v`.  For several implementations, this request
+sizeof(int)`) while constructing `v`.  For several implementations, this request
 is turned into a 16 byte region.
 
 ## Why not `realloc` ## {#reallocation}
@@ -140,10 +140,12 @@ sized_ptr_t&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
 <ul>
    <li><ins>*Effects:* Let `s` be the result of `allocate_at_least(a, n)`.
    Memory is allocated for at least `n` objects of type `T` but objects are not
-   constructed.  A pointer to that memory is returned as `s.ptr`.  The actual
-   number of objects `m`, such that `m>=n`, that memory has been allocated for
-   is returned as `s.n`.</ins></li>
-   <li><ins>[ *Note:* If `n=0`, the value of `s.ptr` is unspecified. -- end note]</ins></li>
+   constructed.<ins></li>
+   <li><ins>*Returns:* `sized_ptr_t{ptr, m}`, where `ptr` is that memory and
+   `m` is the number of objects for which memory has been allocated, such that
+   `m>=n`.</ins></li>
+   <li><ins>[ *Note:* If `s.n == 0`, the value of `s.ptr` is unspecified. --
+   end note]</ins></li>
 </ul>
 
 Table 34 - Cpp17Allocator Requirements
