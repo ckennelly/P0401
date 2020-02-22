@@ -212,6 +212,15 @@ requirements.  The original (requested) size is unavailable, so we relax the
 `std::pmr::memory_resource` is implemented using virtual functions.  Adding new
 methods, such as the proposed allocate API would require taking an ABI break.
 
+## Zero-Sized Requests ## {#zero}
+
+In Prague, LEWG discussed the behavior of `allocate_at_least(allocator, 0)`.
+This maximizes implementation freedom.
+
+*   The return value may not be dereferenceable (even if not `nullptr`).
+*   Other implementations, such as a stack allocator, could just return the
+    current offset.
+
 # Revision History # {#revisions}
 
 ## R2 &rarr; R3 ## {#R3}
