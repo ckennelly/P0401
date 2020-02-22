@@ -7,7 +7,6 @@ Revision: 3
 Editor: Jonathan Wakely, cxx@kayari.org
 Editor: Chris Kennelly, Google, ckennelly@google.com
 Date: 2020-02-15
-Audience: LEWG
 Audience: LWG
 Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
 URL: http://wg21.link/P0401R3
