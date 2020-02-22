@@ -126,14 +126,14 @@ Amend [allocator.requirements]:
 
 <ins>
 <pre>
-template&lt;typename T = void&gt;
-struct sized_ptr_t {
+template&lt;typename T&gt;
+struct allocation_result {
   T *ptr;
   size_t n;
 };
 
 template&lt;typename T, typename Allocator = std::allocator&lt;T&gt;&gt;
-sized_ptr_t&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
+allocation_result&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
 </pre>
 </ins>
 
@@ -141,9 +141,9 @@ sized_ptr_t&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
    <li><ins>*Effects:* Let `s` be the result of `allocate_at_least(a, n)`.
    Memory is allocated for at least `n` objects of type `T` but objects are not
    constructed.<ins></li>
-   <li><ins>*Returns:* `sized_ptr_t{ptr, m}`, where `ptr` is that memory and
-   `m` is the number of objects for which memory has been allocated, such that
-   `m>=n`.</ins></li>
+   <li><ins>*Returns:* `allocation_result{ptr, m}`, where `ptr` is that memory
+   and `m` is the number of objects for which memory has been allocated, such
+   that `m>=n`.</ins></li>
    <li><ins>[ *Note:* If `s.n == 0`, the value of `s.ptr` is unspecified. --
    end note]</ins></li>
 </ul>
@@ -199,6 +199,15 @@ methods, such as the proposed allocate API would require taking an ABI break.
 
 # Revision History # {#revisions}
 
+## R2 &rarr; R3 ## {#R3}
+
+Applied LEWG feedback from [[Prague]].
+
+*   Renamed `sized_ptr_t` to `allocation_result`, based on discussion in Prague
+    that this library proposal (which returns a *count* of storage for objects)
+    have a distinct type from the underlying language proposal ([[P0901R5]],
+    which returns bytes).  This was one of the names bikeshedded during the
+    review of P0901R5.
 ## R1 &rarr; R2 ## {#R2}
 
 Applied LEWG feedback from [[Cologne]].
@@ -251,10 +260,20 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
 	"date": "2019-10-03",
 	"title": "Size feedback in operator new"
     },
+    "P0901R5-Review": {
+        "href": "http://wiki.edg.com/bin/view/Wg21prague/P0901",
+	"date": "2020-02-10",
+	"title": "P0901R5 LEWG Review Prague"
+    },
     "N4800": {
         "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4800.pdf",
 	"date": "2019-01-21",
 	"title": "Working Draft, Standard for Programming Language C++"
+    },
+    "Prague": {
+        "href": "http://wiki.edg.com/bin/view/Wg21prague/P0401",
+	"date": "2020-02-14",
+	"title": "P0401R2 LEWG Review Prague"
     },
     "jemalloc": {
         "title": "jemalloc(3) - Linux man page",
