@@ -280,6 +280,16 @@ POLL: We want to deduce the object type from the allocator (alloc_least_n [sic])
 </table>
 </blockquote>
 
+<blockquote>
+POLL: We like the design, please revise and do initial wording review (with
+Pablo, and David Stone) send to LWG (tentatively Ready).
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>6</td><td>12</td><td>0</td><td>0</td><td>0</td></tr>
+</table>
+</blockquote>
+
 ## R1 &rarr; R2 ## {#R2}
 
 Applied LEWG feedback from [[Cologne]].
