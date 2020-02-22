@@ -149,8 +149,8 @@ constexpr allocation_result&lt;Allocator::pointer&gt; allocate_at_least(Allocato
    <li><ins>*Returns:* `allocation_result{ptr, m}`, where `ptr` is that memory
    and `m` is the number of objects for which memory has been allocated, such
    that `m>=n`.</ins></li>
-   <li><ins>[ *Note:* If `s.n == 0`, the value of `s.ptr` is unspecified. --
-   end note]</ins></li>
+   <li><ins>[ *Note:* If `s.count == 0`, the value of `s.ptr` is unspecified.
+   -- end note]</ins></li>
 </ul>
 
 Table 34 - Cpp17Allocator Requirements
