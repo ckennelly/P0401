@@ -130,6 +130,13 @@ struct allocation_result {
   T *ptr;
   size_t count;
 };
+</pre>
+<p>
+The class template `allocation_result` has the template parameters, data
+members, and special members specified above. It has no base classes or members
+other than those specified.
+</p>
+<pre>
 template&lt;typename Allocator&gt;
 constexpr allocation_result&lt;Allocator::pointer&gt; allocate_at_least(Allocator& a, size_t n);
 </pre>
@@ -239,6 +246,9 @@ POLL: Change the template parameter to sized_ptr_t to pointer type (to support f
 Unanimous consent
 </blockquote>
 
+*    Added design intent and wording that `allocation_result` be compatible
+     with structured bindings.  This wording was adapted from the proposed
+     resolution of [[LWG3373]].
 *    Added `constexpr`
 *    Removed default template parameter from `allocation_result`
 *    Based on LEWG feedback, changed `allocate_at_least` to deduce return type
@@ -325,6 +335,10 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
     "jemalloc": {
         "title": "jemalloc(3) - Linux man page",
         "href": "http://jemalloc.net/jemalloc.3.html"
+    },
+    "LWG3373": {
+        "title": "{to,from}_chars_result and format_to_n_result need the 'we really mean what we say' wording",
+        "href": "https://cplusplus.github.io/LWG/lwg-active.html#3373"
     }
 }
 </pre>
