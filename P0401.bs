@@ -128,7 +128,7 @@ Amend [allocator.requirements]:
 template&lt;typename T&gt;
 struct allocation_result {
   T *ptr;
-  size_t n;
+  size_t count;
 };
 
 template&lt;typename T, typename Allocator = std::allocator&lt;T&gt;&gt;
@@ -178,6 +178,16 @@ There are multiple approaches here:
     hampers optimization depending on ABI, as the value is returned via memory
     rather than a register.
 
+## Size Return Value ## {#returnvalue}
+
+In [[Prague]], LEWG discussed the return value.  For compatibility with the
+existing allocator APIs, which work in units of *objects* rather than bytes,
+this proposal chooses to continue to return an integer number of objects.
+
+Additionally, for types with non-trivial alignment requirements, we must
+allocate storage for objects, rather than bytes, as raw bytes do not convey the
+appropriate alignment needs to the allocator.
+
 ## `deallocate` changes ## {#deallocate}
 
 We now require flexibility on the size we pass to `deallocate`.  For container
@@ -207,6 +217,20 @@ Applied LEWG feedback from [[Prague]].
     have a distinct type from the underlying language proposal ([[P0901R5]],
     which returns bytes).  This was one of the names bikeshedded during the
     review of P0901R5.
+*   Renamed `n` (the returned size) to `count`, based on discussion in Prague
+    to clarify that is measured in objects, rather than bytes.  Additionally,
+    augmented discussion of the `deallocate` changes for why implementations
+    may not be able to preserve the precise size returned by the underlying
+    allocator.
+
+<blockquote>
+Poll: We prefer to return number of bytes.
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>0</td><td>0</td><td>6</td><td>6</td><td>5</td></tr>
+</table>
+</blockquote>
 *    Added `constexpr`
 
 ## R1 &rarr; R2 ## {#R2}
