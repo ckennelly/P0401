@@ -125,9 +125,9 @@ Amend [allocator.requirements]:
 
 <ins>
 <pre>
-template&lt;typename T&gt;
+template&lt;typename Pointer&gt;
 struct allocation_result {
-  T *ptr;
+  Pointer ptr;
   size_t count;
 };
 </pre>
