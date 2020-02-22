@@ -207,6 +207,12 @@ As the true size is expected to be useful for the `capacity` of a `string` or
 requirements.  The original (requested) size is unavailable, so we relax the
 `deallocate` size parameter requirements for these allocations.
 
+For example:  In the `std::vector<T>` case, many implementations use 3 pointers
+for representing the state of the container (begin, end, and capacity).  If we
+preserved the precise value returned by the underlying allocator, we may not be
+able to legally form the capacity pointer.  (For these implementations,
+replacing the capacity pointer with a capacity in bytes would be an ABI break.)
+
 ## Interaction with `polymorphic_allocator` ## {#pmr}
 
 `std::pmr::memory_resource` is implemented using virtual functions.  Adding new
