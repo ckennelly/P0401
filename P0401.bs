@@ -130,9 +130,8 @@ struct allocation_result {
   T *ptr;
   size_t count;
 };
-
-template&lt;typename T, typename Allocator = std::allocator&lt;T&gt;&gt;
-constexpr allocation_result&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
+template&lt;typename Allocator&gt;
+constexpr allocation_result&lt;Allocator::pointer&gt; allocate_at_least(Allocator& a, size_t n);
 </pre>
 </ins>
 
@@ -231,7 +230,30 @@ Poll: We prefer to return number of bytes.
 <tr><td>0</td><td>0</td><td>6</td><td>6</td><td>5</td></tr>
 </table>
 </blockquote>
+
+*   Changed the template parameter to pointer type to allow for fancy pointers.
+
+<blockquote>
+POLL: Change the template parameter to sized_ptr_t to pointer type (to support fancy ptr).
+
+Unanimous consent
+</blockquote>
+
 *    Added `constexpr`
+*    Removed default template parameter from `allocation_result`
+*    Based on LEWG feedback, changed `allocate_at_least` to deduce return type
+     from the allocator.  Since the pointer type is chosen by the allocator,
+     the underlying object type is less relevant.  This also removed the
+     default template parameter.
+
+<blockquote>
+POLL: We want to deduce the object type from the allocator (alloc_least_n [sic]).
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>4</td><td>8</td><td>1</td><td>0</td><td>0</td></tr>
+</table>
+</blockquote>
 
 ## R1 &rarr; R2 ## {#R2}
 
