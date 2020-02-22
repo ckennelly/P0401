@@ -132,7 +132,7 @@ struct allocation_result {
 };
 
 template&lt;typename T, typename Allocator = std::allocator&lt;T&gt;&gt;
-allocation_result&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
+constexpr allocation_result&lt;T&gt; allocate_at_least(Allocator& a, size_t n);
 </pre>
 </ins>
 
@@ -207,6 +207,8 @@ Applied LEWG feedback from [[Prague]].
     have a distinct type from the underlying language proposal ([[P0901R5]],
     which returns bytes).  This was one of the names bikeshedded during the
     review of P0901R5.
+*    Added `constexpr`
+
 ## R1 &rarr; R2 ## {#R2}
 
 Applied LEWG feedback from [[Cologne]].
