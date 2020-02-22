@@ -237,7 +237,7 @@ Applied LEWG feedback from [[Prague]].
     that this library proposal (which returns a *count* of storage for objects)
     have a distinct type from the underlying language proposal ([[P0901R5]],
     which returns bytes).  This was one of the names bikeshedded during the
-    review of P0901R5.
+    review of P0901R5 ([[P0901R5-Review]]).
 *   Renamed `n` (the returned size) to `count`, based on discussion in Prague
     to clarify that is measured in objects, rather than bytes.  Additionally,
     augmented discussion of the `deallocate` changes for why implementations
