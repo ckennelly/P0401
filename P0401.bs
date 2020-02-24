@@ -174,7 +174,7 @@ unspecified. — end note ]</ins>
 <tr>
 <td>`a.deallocate(p,n)`</td>
 <td>(not used)</td>
-<td>*Requires*: `p` shall be a value returned by an earlier call to
+<td>*Preconditions*: `p` shall be a value returned by an earlier call to
 `allocate`<ins> or `allocate_at_least`</ins> that has not been invalidated by
 an intervening call to `deallocate`. <ins>If this memory was obtained by a call
 to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain
@@ -224,7 +224,7 @@ any) in this order.</p>
 <pre>constexpr void deallocate(T* p, size_t n);</pre>
 
 <ul>
-<li>*Requires:* `p` shall be a pointer value obtained from `allocate()`<ins> or
+<li>*Preconditions:* `p` shall be a pointer value obtained from `allocate()`<ins> or
     `allocate_at_least`</ins>. <ins>If this memory was obtained by a call to
     `allocate`,</ins> `n` shall equal the value passed as the first argument to
     the invocation of allocate which returned `p`.  <ins>Otherwise, `n` shall
