@@ -257,6 +257,12 @@ Additionally, for types with non-trivial alignment requirements, we must
 allocate storage for objects, rather than bytes, as raw bytes do not convey the
 appropriate alignment needs to the allocator.
 
+For example:  In the `std::vector<T>` case, many implementations use 3 pointers
+for representing the state of the container (begin, end, and capacity).  If we
+preserved the precise value returned by the underlying allocator, we may not be
+able to legally form the capacity pointer.  For these implementations,
+replacing the capacity pointer with a capacity in bytes would be an ABI break.
+
 ## `deallocate` changes ## {#deallocate}
 
 We now require flexibility on the size we pass to `deallocate`.  For container
@@ -269,12 +275,6 @@ As the true size is expected to be useful for the `capacity` of a `string` or
 `vector` instance, the returned size is available without additional storage
 requirements.  The original (requested) size is unavailable, so we relax the
 `deallocate` size parameter requirements for these allocations.
-
-For example:  In the `std::vector<T>` case, many implementations use 3 pointers
-for representing the state of the container (begin, end, and capacity).  If we
-preserved the precise value returned by the underlying allocator, we may not be
-able to legally form the capacity pointer.  (For these implementations,
-replacing the capacity pointer with a capacity in bytes would be an ABI break.)
 
 ## Interaction with `polymorphic_allocator` ## {#pmr}
 
