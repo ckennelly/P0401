@@ -157,6 +157,21 @@ Table 34 - Cpp17Allocator Requirements
 
 <table>
 <tr>
+<td><ins>`a.allocate_at_least(n)`</ins>
+<td><ins>`allocation_result<X::pointer>`</ins>
+<td><ins>Returns `allocation_result{ptr, m}`.  Memory is allocated for at least
+`n` objects of type `T` but objects are not constructed and returned as `ptr`.
+The actual number of objects `m`, such that `m>=n`, that memory has been
+allocated for is returned in the second value.  `allocate_at_least` may throw
+an appropriate exception. [ Note: If `n == 0`, the value of `ptr` is
+unspecified. — end note ]</ins>
+</td>
+<td>
+<ins>`{a.allocate(n), n}`</ins>
+<td>
+</tr>
+
+<tr>
 <td>`a.deallocate(p,n)`</td>
 <td>(not used)</td>
 <td>*Requires*: `p` shall be a value returned by an earlier call to
@@ -171,6 +186,54 @@ this memory.  <ins>Otherwise, `n` shall satisfy `capacity >= n >= requested` whe
 <td></td>
 </tr>
 </table>
+</blockquote>
+
+Amend [allocator.members]
+
+<blockquote>
+<p>Except for the destructor, member functions of the default allocator shall
+not introduce data races as a result of concurrent calls to those member
+functions from different threads. Calls to these functions that allocate or
+deallocate a particular unit of storage shall occur in a single total order,
+and each such deallocation call shall happen before the next allocation (if
+any) in this order.</p>
+
+<pre>[[nodiscard]] constexpr T* allocate(size_t n);</pre>
+
+<ul>
+<li>*Returns:* A pointer to the initial element of an array of storage of size
+    `n * sizeof(T)`, aligned appropriately for objects of type `T`.</li>
+<li>*Remarks:* the storage is obtained by calling `::operator new`, but it is
+     unspecified when or how often this function is called.</li>
+<li>*Throws:* `bad_array_new_length` if `SIZE_MAX / sizeof(T) < n`, or
+    `bad_alloc` if the storage cannot be obtained.</li>
+</ul>
+
+<pre><ins>[[nodiscard]] constexpr allocation_result&lt;T*&gt; allocate_at_least(size_t n);</ins></pre>
+
+<ul>
+<li><ins>*Returns:* `allocation_result{ptr, count}`, where `ptr` is a pointer to the
+    initial element of an array of storage of size `count * sizeof(T)`, aligned
+    appropriately for objects of type `T`, and `count >= n`.</ins></li>
+<li><ins>*Remarks:* the storage is obtained by calling `::operator new`, but it
+    is unspecified when or how often this function is called.</ins></li>
+<li><ins>*Throws:* `bad_array_new_length` if `SIZE_MAX / sizeof(T) < n`, or
+    `bad_alloc` if the storage cannot be obtained.</ins></li>
+</ul>
+
+<pre>constexpr void deallocate(T* p, size_t n);</pre>
+
+<ul>
+<li>*Requires:* `p` shall be a pointer value obtained from `allocate()`<ins> or
+    `allocate_at_least`</ins>. <ins>If this memory was obtained by a call to
+    `allocate`,</ins> `n` shall equal the value passed as the first argument to
+    the invocation of allocate which returned `p`.  <ins>Otherwise, `n` shall
+    satisfy `count >= n >= requested` where `[p, count] =
+    allocate_at_least(requested)` was used to obtain this memory.</ins></li>
+<li>*Effects:* Deallocates the storage referenced by `p`.</li>
+<li>*Remarks:* Uses `::operator delete`, but it is unspecified when this
+    function is called.</li>
+</ul>
 </blockquote>
 
 # Design Considerations # {#design}
