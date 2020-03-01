@@ -101,7 +101,8 @@ initial request and inform the caller how much memory was made available.
 ## Why not ask the allocator for the size ## {#size}
 
 We could also explore APIs that answer the question: "If I ask for `N` bytes,
-how many do I actually get?"  [[jemalloc]] calls this `nallocx`.
+how many do I actually get?"  [[jemalloc]] and [[TCMalloc]] call this
+`nallocx`.
 
 *   `nallocx` requires an extra call / size calculation.  This requires we
     duplicate work, as the size calculation is performed as part of allocation
@@ -427,6 +428,10 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
     "LWG3373": {
         "title": "{to,from}_chars_result and format_to_n_result need the 'we really mean what we say' wording",
         "href": "https://cplusplus.github.io/LWG/lwg-active.html#3373"
+    },
+    "TCMalloc": {
+        "href": "https://github.com/google/tcmalloc",
+        "title": "TCMalloc"
     }
 }
 </pre>
