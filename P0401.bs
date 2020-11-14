@@ -358,7 +358,7 @@ Amend [version.syn]
 
 <blockquote>
 <pre>
-<ins>__cpp_lib_allocate_at_least PLACEHOLDER // also in <memory></ins>
+<ins>__cpp_lib_allocate_at_least PLACEHOLDER // also in &lt;memory&gt;</ins>
 </pre>
 </blockquote>
 
