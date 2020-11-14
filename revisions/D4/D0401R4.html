@@ -1397,7 +1397,7 @@ Possible extra rowspan handling
   <meta content="Bikeshed version 89ebb6ab, updated Fri Oct 9 15:32:07 2020 -0700" name="generator">
   <link href="http://htmlpreview.github.io/?https://github.com/ckennelly/P0401/master/revisions/D4/D0401R4.html" rel="canonical">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
-  <meta content="45000ae81e19e048e5eddc983fbe81c8b03e2c03" name="document-revision">
+  <meta content="e2188fb979d7d69bdece3b164e6e5bf98d3c592a" name="document-revision">
 <style>/* style-autolinks */
 
 .css.css, .property.property, .descriptor.descriptor {
@@ -1899,7 +1899,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D0401R4<br>Providing size feedback in the Allocator interface</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2020-11-13">2020-11-13</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2020-11-14">2020-11-14</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>This version:
@@ -2209,7 +2209,7 @@ any) in this order.</p>
      <li>
       <del><em>Preconditions:</em> <code class="highlight"><c- n>p</c-></code> is a pointer value obtained from <code class="highlight"><c- n>allocate</c-><c- p>()</c-></code>. <code class="highlight"><c- n>n</c-></code> equals the value passed as the first argument to the invocation of allocate which returned <code class="highlight"><c- n>p</c-></code>.</del>
      <li>
-      <ins><em>Preconditions:</em> <code class="highlight"><c- n>p</c-></code> shall be a value returned by an earlier call to, <code class="highlight"><c- k>auto</c-> <c- n>p</c-> <c- o>=</c-> <c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code> or <code class="highlight"><c- k>auto</c-> <c- p>[</c-><c- n>p</c-><c- p>,</c-> <c- n>count</c-><c- p>]</c-> <c- o>=</c-> <c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>req</c-><c- p>)</c-></code> and that <code class="highlight"><c- n>p</c-></code> has not been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>. If memory was obtained by a call to <code class="highlight"><c- n>allocate</c-></code>, <code class="highlight"><c- n>n</c-></code> shall match the value passed to <code class="highlight"><c- n>allocate</c-></code> to obtain this memory. Otherwise, if memory was obtained by a call to <code class="highlight"><c- n>allocate_at_least</c-></code>, <code class="highlight"><c- n>n</c-></code> shall have a value such that <code class="highlight"><c- n>req</c-> <c- o>&lt;=</c-> <c- n>n</c-> <c- o>&lt;=</c-> <c- n>count</c-></code>.</ins>
+      <ins><em>Preconditions:</em> If memory was obtained by a call to <code class="highlight"><c- k>auto</c-> <c- p>[</c-><c- n>p</c-><c- p>,</c-> <c- n>count</c-><c- p>]</c-> <c- o>=</c-> <c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>req</c-><c- p>)</c-></code>, <code class="highlight"><c- n>n</c-></code> shall have a value such that <code class="highlight"><c- n>req</c-> <c- o>&lt;=</c-> <c- n>n</c-> <c- o>&lt;=</c-> <c- n>count</c-></code>. Otherwise, <code class="highlight"><c- n>p</c-></code> shall be the value returned by an earlier call to <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>n</c-></code> shall match the value passed to allocate. In either case, <code class="highlight"><c- n>p</c-></code> shall not have been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>.</ins>
      <li><em>Effects:</em> Deallocates the storage referenced by <code class="highlight"><c- n>p</c-></code>.
      <li><em>Remarks:</em> Uses <code class="highlight"><c- o>::</c-><c- k>operator</c-> <c- k>delete</c-></code>, but it is unspecified when this function is called.
     </ul>
@@ -2231,7 +2231,7 @@ any) in this order.</p>
        <td>(not used)
        <td>
         <del><em>Preconditions:</em> <code class="highlight"><c- n>p</c-></code> is a value returned by an earlier call to <code class="highlight"><c- n>allocate</c-></code> that has not been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>. <code class="highlight"><c- n>n</c-></code> matches the value passed to <code class="highlight"><c- n>allocate</c-></code> to obtain this memory.</del>
-        <ins><em>Preconditions:</em> <code class="highlight"><c- n>p</c-></code> shall be a value returned by an earlier call to, <code class="highlight"><c- k>auto</c-> <c- n>p</c-> <c- o>=</c-> <c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code> or <code class="highlight"><c- k>auto</c-> <c- p>[</c-><c- n>p</c-><c- p>,</c-> <c- n>count</c-><c- p>]</c-> <c- o>=</c-> <c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>req</c-><c- p>)</c-></code> and that <code class="highlight"><c- n>p</c-></code> has not been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>. If memory was obtained by a call to <code class="highlight"><c- n>allocate</c-></code>, <code class="highlight"><c- n>n</c-></code> shall match the value passed to <code class="highlight"><c- n>allocate</c-></code> to obtain this memory. Otherwise, if memory was obtained by a call to <code class="highlight"><c- n>allocate_at_least</c-></code>, <code class="highlight"><c- n>n</c-></code> shall have a value such that <code class="highlight"><c- n>req</c-> <c- o>&lt;=</c-> <c- n>n</c-> <c- o>&lt;=</c-> <c- n>count</c-></code>.</ins>
+        <ins><em>Preconditions:</em> If memory was obtained by a call to <code class="highlight"><c- k>auto</c-> <c- p>[</c-><c- n>p</c-><c- p>,</c-> <c- n>count</c-><c- p>]</c-> <c- o>=</c-> <c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>req</c-><c- p>)</c-></code>, <code class="highlight"><c- n>n</c-></code> shall have a value such that <code class="highlight"><c- n>req</c-> <c- o>&lt;=</c-> <c- n>n</c-> <c- o>&lt;=</c-> <c- n>count</c-></code>. Otherwise, <code class="highlight"><c- n>p</c-></code> shall be the value returned by an earlier call to <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>n</c-></code> shall match the value passed to allocate. In either case, <code class="highlight"><c- n>p</c-></code> shall not have been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>.</ins>
          <em>Throws</em>: Nothing. 
        <td>
     </table>
@@ -2302,7 +2302,7 @@ current offset.</p>
    <h3 class="heading settled" data-level="5.1" id="R4"><span class="secno">5.1. </span><span class="content">R3 → R4</span><a class="self-link" href="#R4"></a></h3>
    <ul>
     <li data-md>
-     <p>Applied wording feedback from Pablo</p>
+     <p>Applied wording feedback from Pablo Halpern and David Stone</p>
     <li data-md>
      <p>Added discussion about changes to deallocation</p>
     <li data-md>

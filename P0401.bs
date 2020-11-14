@@ -6,7 +6,7 @@ Group: WG21
 Revision: 4
 Editor: Jonathan Wakely, cxx@kayari.org
 Editor: Chris Kennelly, Google, ckennelly@google.com
-Date: 2020-11-13
+Date: 2020-11-14
 Audience: LWG
 Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
 URL: http://htmlpreview.github.io/?https://github.com/ckennelly/P0401/master/revisions/D4/D0401R4.html
@@ -319,7 +319,7 @@ any) in this order.</p>
 
 <ul>
 <li><del>*Preconditions:* `p` is a pointer value obtained from `allocate()`. `n` equals the value passed as the first argument to the invocation of allocate which returned `p`.</del></li>
-<li><ins>*Preconditions:* `p` shall be a value returned by an earlier call to, `auto p = allocate(n)` or `auto [p, count] = a.allocate_at_least(req)` and that `p` has not been invalidated by an intervening call to `deallocate`. If memory was obtained by a call to `allocate`, `n` shall match the value passed to `allocate` to obtain this memory. Otherwise, if memory was obtained by a call to `allocate_at_least`, `n` shall have a value such that `req <= n <= count`.</ins></li>
+<li><ins>*Preconditions:*  If memory was obtained by a call to `auto [p, count] = a.allocate_at_least(req)`, `n` shall have a value such that `req <= n <= count`. Otherwise, `p` shall be the value returned by an earlier call to `allocate` and `n` shall match the value passed to allocate. In either case, `p` shall not have been invalidated by an intervening call to `deallocate`.</ins></li>
 <li>*Effects:* Deallocates the storage referenced by `p`.</li>
 <li>*Remarks:* Uses `::operator delete`, but it is unspecified when this function is called.</li>
 </ul>
@@ -342,7 +342,7 @@ Amend [allocator.requirements.general], [tab:cpp17.allocator]
 <td>`a.deallocate(p,n)`</td>
 <td>(not used)</td>
 <td><del>*Preconditions:* `p` is a value returned by an earlier call to `allocate` that has not been invalidated by an intervening call to `deallocate`. `n` matches the value passed to `allocate` to obtain this memory.</del>
-<ins>*Preconditions:* `p` shall be a value returned by an earlier call to, `auto p = allocate(n)` or `auto [p, count] = a.allocate_at_least(req)` and that `p` has not been invalidated by an intervening call to `deallocate`. If memory was obtained by a call to `allocate`, `n` shall match the value passed to `allocate` to obtain this memory. Otherwise, if memory was obtained by a call to `allocate_at_least`, `n` shall have a value such that `req <= n <= count`.</ins>
+<ins>*Preconditions:*  If memory was obtained by a call to `auto [p, count] = a.allocate_at_least(req)`, `n` shall have a value such that `req <= n <= count`. Otherwise, `p` shall be the value returned by an earlier call to `allocate` and `n` shall match the value passed to allocate. In either case, `p` shall not have been invalidated by an intervening call to `deallocate`.</ins>
 *Throws*: Nothing.
 </td>
 <td></td>
@@ -436,7 +436,7 @@ This maximizes implementation freedom.
 
 ## R3 &rarr; R4 ## {#R4}
 
-*   Applied wording feedback from Pablo
+*   Applied wording feedback from Pablo Halpern and David Stone
 *   Added discussion about changes to deallocation
 *   Proposed feature test macro
 
