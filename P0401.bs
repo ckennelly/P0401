@@ -1,12 +1,12 @@
 <pre class='metadata'>
 Title: Providing size feedback in the Allocator interface
-Status: P
-Shortname: P0401
+Status: D
+Shortname: D0401
 Group: WG21
-Revision: 3
+Revision: 4
 Editor: Jonathan Wakely, cxx@kayari.org
 Editor: Chris Kennelly, Google, ckennelly@google.com
-Date: 2020-03-01
+Date: 2020-11-13
 Audience: LWG
 Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
 URL: http://wg21.link/P0401R3
@@ -115,81 +115,178 @@ See also [[P0901R5]]'s discussion "`nallocx`: not as awesome as it looks."
 
 # Proposal # {#proposal}
 
-Wording relative to [[N4800]].
+Wording relative to [[N4868]].
 
 We propose a free function to return the allocation size simultaneously with an
 allocation.
 
+Amend [memory.syn]:
+
 <blockquote>
-
-Amend [allocator.requirements]:
-
-<ins>
 <pre>
-template&lt;typename Pointer&gt;
-struct allocation_result {
-  Pointer ptr;
-  size_t count;
-};
+namespace std {
+  // ... elided ...
+
+  // [allocator.traits], allocator traits
+  template&lt;class Alloc&gt; struct allocator_traits;
+
+  <ins>template&lt;typename Pointer&gt;
+  struct allocation_result {
+    Pointer ptr;
+    size_t count;
+  };
+
+  template&lt;typename Allocator&gt;
+  constexpr allocation_result&lt;typename Allocator::pointer&gt; allocate_at_least(
+    Allocator& a, size_t n);</ins>
+
+  // [default.allocator], the default allocator
+  template&lt;class T&gt; class allocator;
+  template&lt;class T, class U&gt;
+    constexpr bool operator==(const allocator&lt;T&gt;&amp;, const allocator&lt;U&gt;&amp;) noexcept;
+
+  // ... elided ...
+}
 </pre>
+</blockquote>
+
+Amend [allocator.traits]:
+
+<blockquote>
+<pre>
+namespace std {
+  template&lt;class Alloc&gt; struct allocator_traits {
+    using allocator_type     = Alloc;
+
+    using value_type         = typename Alloc::value_type;
+
+    using pointer            = see below;
+    using const_pointer      = see below;
+    using void_pointer       = see below;
+    using const_void_pointer = see below;
+
+    using difference_type    = see below;
+    using size_type          = see below;
+
+    using propagate_on_container_copy_assignment = see below;
+    using propagate_on_container_move_assignment = see below;
+    using propagate_on_container_swap            = see below;
+    using is_always_equal                        = see below;
+
+    template&lt;class T&gt; using rebind_alloc = see below;
+    template&lt;class T&gt; using rebind_traits = allocator_traits&lt;rebind_alloc&lt;T&gt;&gt;;
+
+    [[nodiscard]] static constexpr pointer allocate(Alloc&amp; a, size_type n);
+    [[nodiscard]] static constexpr pointer allocate(Alloc&amp; a, size_type n,
+                                                    const_void_pointer hint);
+
+    static constexpr void deallocate(Alloc&amp; a, pointer p, size_type n);
+
+    template&lt;class T, class... Args&gt;
+      static constexpr void construct(Alloc&amp; a, T* p, Args&amp;&amp;... args);
+
+    template&lt;class T&gt;
+      static constexpr void destroy(Alloc&amp; a, T* p);
+
+    static constexpr size_type max_size(const Alloc&amp; a) noexcept;
+
+    static constexpr Alloc select_on_container_copy_construction(const Alloc&amp; rhs);
+  };
+
+  <ins>template&lt;typename Pointer&gt;
+  struct allocation_result {
+    Pointer ptr;
+    size_t count;
+  };
+
+  template&lt;typename Allocator&gt;
+  constexpr allocation_result&lt;typename Allocator::pointer&gt; allocate_at_least(
+    Allocator&amp; a, size_t n);</ins>
+}
+</pre>
+</blockquote>
+
+Amend [allocator.traits.types]:
+
+<blockquote>
+<ins>
 <p>
 The class template `allocation_result` has the template parameters, data
 members, and special members specified above. It has no base classes or members
 other than those specified.
 </p>
-<pre>
-template&lt;typename Allocator&gt;
-constexpr allocation_result&lt;Allocator::pointer&gt; allocate_at_least(Allocator& a, size_t n);
-</pre>
 </ins>
-
-<ul>
-   <li><ins>*Effects:* Let `s` be the result of `allocate_at_least(a, n)`.
-   Memory is allocated for at least `n` objects of type `T` but objects are not
-   constructed.<ins></li>
-   <li><ins>*Returns:* `allocation_result{ptr, m}`, where `ptr` is that memory
-   and `m` is the number of objects for which memory has been allocated, such
-   that `m>=n`.</ins></li>
-   <li><ins>[ *Note:* If `s.count == 0`, the value of `s.ptr` is unspecified.
-   -- end note]</ins></li>
-</ul>
-
-Table 34 - Cpp17Allocator Requirements
-
-<table>
-<tr>
-<td><ins>`a.allocate_at_least(n)`</ins>
-<td><ins>`allocation_result<X::pointer>`</ins>
-<td><ins>Returns `allocation_result{ptr, m}`.  Memory is allocated for at least
-`n` objects of type `T` but objects are not constructed and returned as `ptr`.
-The actual number of objects `m`, such that `m>=n`, that memory has been
-allocated for is returned in the second value.  `allocate_at_least` may throw
-an appropriate exception. [ Note: If `n == 0`, the value of `ptr` is
-unspecified. — end note ]</ins>
-</td>
-<td>
-<ins>`{a.allocate(n), n}`</ins>
-<td>
-</tr>
-
-<tr>
-<td>`a.deallocate(p,n)`</td>
-<td>(not used)</td>
-<td>*Preconditions*: `p` shall be a value returned by an earlier call to
-`allocate`<ins> or `allocate_at_least`</ins> that has not been invalidated by
-an intervening call to `deallocate`. <ins>If this memory was obtained by a call
-to `allocate`,</ins> `n` shall match the value passed to `allocate` to obtain
-this memory.  <ins>Otherwise, `n` shall satisfy `capacity >= n >= requested` where
-`[p, capacity] = allocate_at_least(requested)` was used to obtain this memory.</ins>
-
-*Throws*: Nothing.
-</td>
-<td></td>
-</tr>
-</table>
 </blockquote>
 
-Amend [allocator.members]
+Amend [allocator.traits.members]:
+
+<blockquote>
+<pre>
+[[nodiscard]] static constexpr pointer allocate(Alloc&amp; a, size_type n);
+</pre>
+
+<ul>
+<li>*Returns:* `a.allocate(n).`</li>
+</ul>
+
+<pre>
+[[nodiscard]] static constexpr pointer allocate(Alloc&amp; a, size_type n, const_void_pointer hint);
+</pre>
+
+<ul>
+<li>*Returns:* `a.allocate(n, hint)` if that expression is well-formed; otherwise, `a.allocate(n)`.
+</ul>
+
+<pre>
+<ins>
+template&lt;typename Allocator&gt;
+constexpr allocation_result&lt;typename Allocator::pointer&gt; allocate_at_least(
+  Allocator& a, size_t n);
+</ins>
+</pre>
+
+<ul>
+<li><ins>*Returns:* `a.allocate_at_least(n)` if that expression is well-formed; otherwise, `a.allocate(n)`.</ins>
+</ul>
+
+<pre>
+static constexpr void deallocate(Alloc&amp; a, pointer p, size_type n);
+</pre>
+
+<ul>
+<li>*Effects:* Calls `a.deallocate(p, n)`.</li>
+<li>*Throws:* Nothing.</li>
+</ul>
+</blockquote>
+
+Amend [default.allocator.general]:
+
+<blockquote>
+<pre>
+namespace std {
+  template&lt;class T&gt; class allocator {
+   public:
+    using value_type                             = T;
+    using size_type                              = size_t;
+    using difference_type                        = ptrdiff_t;
+    using propagate_on_container_move_assignment = true_type;
+    using is_always_equal                        = true_type;
+
+    constexpr allocator() noexcept;
+    constexpr allocator(const allocator&amp;) noexcept;
+    template&lt;class U&gt; constexpr allocator(const allocator&lt;U&gt;&amp;) noexcept;
+    constexpr ~allocator();
+    constexpr allocator&amp; operator=(const allocator&amp;) = default;
+
+    [[nodiscard]] constexpr T* allocate(size_t n);
+    <ins>[[nodiscard]] constexpr allocation_result&lt;T*&gt; allocate_at_least(size_t n);</ins>
+    constexpr void deallocate(T* p, size_t n);
+  };
+}
+</pre>
+</blockquote>
+
+Amend [allocator.members]:
 
 <blockquote>
 <p>Except for the destructor, member functions of the default allocator shall
@@ -202,39 +299,59 @@ any) in this order.</p>
 <pre>[[nodiscard]] constexpr T* allocate(size_t n);</pre>
 
 <ul>
-<li>*Returns:* A pointer to the initial element of an array of storage of size
-    `n * sizeof(T)`, aligned appropriately for objects of type `T`.</li>
-<li>*Remarks:* the storage is obtained by calling `::operator new`, but it is
-     unspecified when or how often this function is called.</li>
-<li>*Throws:* `bad_array_new_length` if `SIZE_MAX / sizeof(T) < n`, or
-    `bad_alloc` if the storage cannot be obtained.</li>
+<li>*Mandates:* `T` is not an incomplete type ([basic.types]).</li>
+<li>*Returns:* A pointer to the initial element of an array of `n` `T`.</li>
+<li>*Throws:* `bad_array_new_length` if `numeric_limits<size_t>::max() / sizeof(T) < n`, or `bad_alloc` if the storage cannot be obtained.</li>
+<li>*Remarks:* The storage for the array is obtained by calling `::operator new`, but it is unspecified when or how often this function is called. This function starts the lifetime of the array object, but not that of any of the array elements.</li>
+</li>
 </ul>
 
 <pre><ins>[[nodiscard]] constexpr allocation_result&lt;T*&gt; allocate_at_least(size_t n);</ins></pre>
 
 <ul>
-<li><ins>*Returns:* `allocation_result{ptr, count}`, where `ptr` is a pointer to the
-    initial element of an array of storage of size `count * sizeof(T)`, aligned
-    appropriately for objects of type `T`, and `count >= n`.</ins></li>
-<li><ins>*Remarks:* the storage is obtained by calling `::operator new`, but it
-    is unspecified when or how often this function is called.</ins></li>
-<li><ins>*Throws:* `bad_array_new_length` if `SIZE_MAX / sizeof(T) < n`, or
-    `bad_alloc` if the storage cannot be obtained.</ins></li>
+<li><ins>*Mandates:* `T` is not an incomplete type ([basic.types]).</ins></li>
+<li><ins>*Returns:* `allocation_result<T*>{ptr, count}`, where `ptr` is a pointer to the initial element of an array of `count` `T` and `count >= n`.</ins></li>
+<li><ins>*Throws:* `bad_array_new_length` if `numeric_limits<size_t>::max() / sizeof(T) < n`, or `bad_alloc` if the storage cannot be obtained.</ins></li>
+<li><ins>*Remarks:* The storage for the array is obtained by calling `::operator new`, but it is unspecified when or how often this function is called. This function starts the lifetime of the array object, but not that of any of the array elements.</ins></li>
 </ul>
 
 <pre>constexpr void deallocate(T* p, size_t n);</pre>
 
 <ul>
-<li>*Preconditions:* `p` shall be a pointer value obtained from `allocate()`<ins> or
-    `allocate_at_least`</ins>. <ins>If this memory was obtained by a call to
-    `allocate`,</ins> `n` shall equal the value passed as the first argument to
-    the invocation of allocate which returned `p`.  <ins>Otherwise, `n` shall
-    satisfy `count >= n >= requested` where `[p, count] =
-    allocate_at_least(requested)` was used to obtain this memory.</ins></li>
+<li><del>*Preconditions:* `p` is a pointer value obtained from `allocate()`. `n` equals the value passed as the first argument to the invocation of allocate which returned `p`.</del></li>
+<li><ins>*Preconditions:* `p` shall be a value returned by an earlier call to, `auto p = allocate(n)` or `auto [p, count] = a.allocate_at_least(req)` and that `p` has not been invalidated by an intervening call to `deallocate`. If memory was obtained by a call to `allocate`, `n` shall match the value passed to `allocate` to obtain this memory. Otherwise, if memory was obtained by a call to `allocate_at_least`, `n` shall have a value such that `req <= n <= count`.</ins></li>
 <li>*Effects:* Deallocates the storage referenced by `p`.</li>
-<li>*Remarks:* Uses `::operator delete`, but it is unspecified when this
-    function is called.</li>
+<li>*Remarks:* Uses `::operator delete`, but it is unspecified when this function is called.</li>
 </ul>
+</blockquote>
+
+Amend [allocator.requirements.general], [tab:cpp17.allocator]
+
+<blockquote>
+
+<table>
+<tr>
+<td><ins>`a.allocate_at_least(n)`</ins>
+<td><ins>`allocation_result<X::pointer>{ptr, count}`</ins>
+<td><ins>Memory is allocated for an array of `count` `T` and such an object is created but array elements are not constructed, such that `count >= n`. `allocate_at_least` may throw an appropriate exception. See Note C, below.</ins></li>
+</td>
+<td></td>
+</tr>
+
+<tr>
+<td>`a.deallocate(p,n)`</td>
+<td>(not used)</td>
+<td><del>*Preconditions:* `p` is a value returned by an earlier call to `allocate` that has not been invalidated by an intervening call to `deallocate`. `n` matches the value passed to `allocate` to obtain this memory.</del>
+<ins>*Preconditions:* `p` shall be a value returned by an earlier call to, `auto p = allocate(n)` or `auto [p, count] = a.allocate_at_least(req)` and that `p` has not been invalidated by an intervening call to `deallocate`. If memory was obtained by a call to `allocate`, `n` shall match the value passed to `allocate` to obtain this memory. Otherwise, if memory was obtained by a call to `allocate_at_least`, `n` shall have a value such that `req <= n <= count`.</ins>
+*Throws*: Nothing.
+</td>
+<td></td>
+</tr>
+</table>
+
+... elided ...
+
+<ins>Note C:  If `n == 0`, the return value is unspecified.  An allocator need not support `allocate_at_least`, but no default is provided in `allocator_traits`.  Instead, the function `std::allocate_at_least(a, n)` will default to returning `allocation_result<typename X::pointer>{ a.allocate(n), n }` if `a.allocate_at_least(n)` is not a valid expression.</ins>
 </blockquote>
 
 # Design Considerations # {#design}
@@ -292,6 +409,10 @@ This maximizes implementation freedom.
     current offset.
 
 # Revision History # {#revisions}
+
+## R3 &rarr; R4 ## {#R4}
+
+*   Applied wording feedback from Pablo
 
 ## R2 &rarr; R3 ## {#R3}
 
@@ -414,6 +535,11 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
     "N4800": {
         "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4800.pdf",
 	"date": "2019-01-21",
+	"title": "Working Draft, Standard for Programming Language C++"
+    },
+    "N4868": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/n4868.pdf",
+	"date": "2019-10-18",
 	"title": "Working Draft, Standard for Programming Language C++"
     },
     "Prague": {
