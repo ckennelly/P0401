@@ -402,6 +402,22 @@ As the true size is expected to be useful for the `capacity` of a `string` or
 requirements.  The original (requested) size is unavailable, so we relax the
 `deallocate` size parameter requirements for these allocations.
 
+In [[P0901R5]], we anticipate use cases where the user does not store enough
+information about the size to return a precise, byte-level count.  We may be
+allocating `T`'s and receive enough storage to allocate 3.5 objects.  Requiring
+callers return the precise size may be impractical (`std::vector` frequently
+stores its capacity as a `T*`) without additionally auxillary storage.
+
+In this paper, we may be similarly unable to return the true size back.  In the
+[[Prague]] review of this paper, we discussed cases where we rounded down to
+the multiple of the size being allocated.  Alternatively, custom data
+structures may use `allocator` to obtain storage, but quantize that.  In
+Abseil's [[Cord]], data is stored in chunks with a length-encoding tag at the
+start of each chunk.  These tags quantize the capacity in `AllocatedSizeToTag`
+that can be represented to multiples of 16- and 32-bytes.  This makes the
+encoded length more compact, but means we cannot reproduce the size the
+allocator provided us precisely.
+
 ## Interaction with `polymorphic_allocator` ## {#pmr}
 
 `std::pmr::memory_resource` is implemented using virtual functions.  Adding new
@@ -421,6 +437,7 @@ This maximizes implementation freedom.
 ## R3 &rarr; R4 ## {#R4}
 
 *   Applied wording feedback from Pablo
+*   Added discussion about changes to deallocation
 *   Proposed feature test macro
 
 ## R2 &rarr; R3 ## {#R3}
@@ -525,6 +542,10 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
         "href": "http://wiki.edg.com/bin/view/Wg21cologne2019/P0401",
 	"date": "2019-07-17",
 	"title": "Cologne Meeting Minutes"
+    },
+    "Cord": {
+	"href": "https://github.com/abseil/abseil-cpp/blob/master/absl/strings/cord.h",
+	"title": "absl::Cord"
     },
     "P0894R1": {
         "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0894r1.md",
