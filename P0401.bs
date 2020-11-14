@@ -354,6 +354,14 @@ Amend [allocator.requirements.general], [tab:cpp17.allocator]
 <ins>Note C:  If `n == 0`, the return value is unspecified.  An allocator need not support `allocate_at_least`, but no default is provided in `allocator_traits`.  Instead, the function `std::allocate_at_least(a, n)` will default to returning `allocation_result<typename X::pointer>{ a.allocate(n), n }` if `a.allocate_at_least(n)` is not a valid expression.</ins>
 </blockquote>
 
+Amend [version.syn]
+
+<blockquote>
+<pre>
+<ins>__cpp_lib_allocate_at_least PLACEHOLDER // also in <memory></ins>
+</pre>
+</blockquote>
+
 # Design Considerations # {#design}
 
 ## `allocate` selection ## {#overloads}
@@ -413,6 +421,7 @@ This maximizes implementation freedom.
 ## R3 &rarr; R4 ## {#R4}
 
 *   Applied wording feedback from Pablo
+*   Proposed feature test macro
 
 ## R2 &rarr; R3 ## {#R3}
 
