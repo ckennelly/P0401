@@ -9,7 +9,7 @@ Editor: Chris Kennelly, Google, ckennelly@google.com
 Date: 2020-11-20
 Audience: LWG
 Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
-URL: https://wg21.link/D0901R5
+URL: http://htmlpreview.github.io/?https://github.com/ckennelly/P0401/master/revisions/D5/D0401R5.html
 Markup Shorthands: markdown yes
 Default Highlight: C++
 </pre>
