@@ -275,12 +275,12 @@ Amend [allocator.requirements.general], [tab:cpp17.allocator]
 </tr>
 
 <tr>
-<td><ins>`a.allocate_at_least(n)`</ins>
-<td><ins>`allocation_result<X::pointer>`</ins>
+<td><ins>`a.allocate_at_least(n)`</ins></td>
+<td><ins>`allocation_result<X::pointer>`</ins></td>
 <td>
-*Returns*: `allocation_result<X::pointer>{ptr, count}` where `p` is memory is allocated for an array of `count` `T` and such an object is created but array elements are not constructed, such that `count >= n`.  `allocate_at_least` may throw an appropriate exception. See Note C, below.</ins>
+<ins>*Returns*: `allocation_result<X::pointer>{ptr, count}` where `p` is memory is allocated for an array of `count` `T` and such an object is created but array elements are not constructed, such that `count >= n`.  `allocate_at_least` may throw an appropriate exception. See Note C, below.</ins>
 </td>
-<td>See Note D, below.</td>
+<td><ins>See Note D, below.</ins></td>
 </tr>
 
 <tr>

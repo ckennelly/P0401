@@ -1395,9 +1395,9 @@ Possible extra rowspan handling
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
   <meta content="Bikeshed version 89ebb6ab, updated Fri Oct 9 15:32:07 2020 -0700" name="generator">
-  <link href="https://wg21.link/D0901R5" rel="canonical">
+  <link href="http://htmlpreview.github.io/?https://github.com/ckennelly/P0401/master/revisions/D5/D0401R5.html" rel="canonical">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
-  <meta content="351dbeacd6116caa8088478818a1d2f00d1f08c0" name="document-revision">
+  <meta content="d005d11ea28d829a2891bbdfeddbcea1ca7ab243" name="document-revision">
 <style>/* style-autolinks */
 
 .css.css, .property.property, .descriptor.descriptor {
@@ -1903,7 +1903,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>This version:
-     <dd><a class="u-url" href="https://wg21.link/D0901R5">https://wg21.link/D0901R5</a>
+     <dd><a class="u-url" href="http://htmlpreview.github.io/?https://github.com/ckennelly/P0401/master/revisions/D5/D0401R5.html">http://htmlpreview.github.io/?https://github.com/ckennelly/P0401/master/revisions/D5/D0401R5.html</a>
      <dt class="editor">Authors:
      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:cxx@kayari.org">Jonathan Wakely</a>
      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:ckennelly@google.com">Chris Kennelly</a> (<span class="p-org org">Google</span>)
@@ -2180,8 +2180,10 @@ any) in this order.</p>
         <ins><code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code></ins>
        <td>
         <ins><code class="highlight"><c- n>allocation_result</c-><c- o>&lt;</c-><c- n>X</c-><c- o>::</c-><c- n>pointer</c-><c- o>></c-></code></ins>
-       <td> <em>Returns</em>: <code class="highlight"><c- n>allocation_result</c-><c- o>&lt;</c-><c- n>X</c-><c- o>::</c-><c- n>pointer</c-><c- o>></c-><c- p>{</c-><c- n>ptr</c-><c- p>,</c-> <c- n>count</c-><c- p>}</c-></code> where <code class="highlight"><c- n>p</c-></code> is memory is allocated for an array of <code class="highlight"><c- n>count</c-></code> <code class="highlight"><c- n>T</c-></code> and such an object is created but array elements are not constructed, such that <code class="highlight"><c- n>count</c-> <c- o>>=</c-> <c- n>n</c-></code>. <code class="highlight"><c- n>allocate_at_least</c-></code> may throw an appropriate exception. See Note C, below. 
-       <td>See Note D, below.
+       <td>
+        <ins><em>Returns</em>: <code class="highlight"><c- n>allocation_result</c-><c- o>&lt;</c-><c- n>X</c-><c- o>::</c-><c- n>pointer</c-><c- o>></c-><c- p>{</c-><c- n>ptr</c-><c- p>,</c-> <c- n>count</c-><c- p>}</c-></code> where <code class="highlight"><c- n>p</c-></code> is memory is allocated for an array of <code class="highlight"><c- n>count</c-></code> <code class="highlight"><c- n>T</c-></code> and such an object is created but array elements are not constructed, such that <code class="highlight"><c- n>count</c-> <c- o>>=</c-> <c- n>n</c-></code>. <code class="highlight"><c- n>allocate_at_least</c-></code> may throw an appropriate exception. See Note C, below.</ins>
+       <td>
+        <ins>See Note D, below.</ins>
       <tr>
        <td><code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-><c- n>n</c-><c- p>)</c-></code>
        <td>(not used)
