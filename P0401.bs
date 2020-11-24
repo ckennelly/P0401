@@ -137,7 +137,7 @@ namespace std {
   };
 
   template&lt;class Allocator&gt;
-  constexpr allocation_result&lt;typename Allocator::pointer&gt; allocate_at_least(
+  constexpr allocation_result&lt;typename allocator_traits<Allocator>::pointer&gt; allocate_at_least(
     Allocator& a, size_t n);</ins>
 
   // [default.allocator], the default allocator
@@ -166,7 +166,7 @@ Insert [allocator.traits.other]:
 <pre>
 <ins>
 template&lt;class Allocator&gt;
-[[nodiscard]] constexpr allocation_result&lt;typename Allocator::pointer&gt;
+[[nodiscard]] constexpr allocation_result&lt;typename allocator_traits<Allocator>::pointer&gt;
   allocate_at_least(Allocator& a, size_t n);
 </ins>
 </pre>
