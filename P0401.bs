@@ -247,7 +247,7 @@ any) in this order.</p>
 </ul>
 </blockquote>
 
-Amend [allocator.requirements.general], [tab:cpp17.allocator]
+Amend [allocator.requirements.general], [tab:cpp17.allocator].  The return type `X::pointer` is used in the table for consistency with `a.allocate` but should be resolved according to the <a href="https://lists.isocpp.org/lib/2020/11/18159.php">LWG issue</a>.
 
 <blockquote>
 
