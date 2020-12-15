@@ -558,7 +558,7 @@ Poll: Prefer a struct rather than a requirement of structured bindings.
     },
     "N4868": {
         "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/n4868.pdf",
-	"date": "2019-10-18",
+	"date": "2020-10-18",
 	"title": "Working Draft, Standard for Programming Language C++"
     },
     "Prague": {
