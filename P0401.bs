@@ -1,15 +1,15 @@
 <pre class='metadata'>
 Title: Providing size feedback in the Allocator interface
-Status: P
+Status: D
 Shortname: P0401
 Group: WG21
-Revision: 5
+Revision: 6
 Editor: Jonathan Wakely, cxx@kayari.org
 Editor: Chris Kennelly, Google, ckennelly@google.com
-Date: 2020-12-14
+Date: 2021-01-22
 Audience: LWG
 Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
-URL: https://wg21.link/P0401R5
+URL: https://wg21.link/P0401R6
 Markup Shorthands: markdown yes
 Default Highlight: C++
 </pre>
