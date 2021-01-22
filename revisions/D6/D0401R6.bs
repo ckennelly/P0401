@@ -1,0 +1,601 @@
+<pre class='metadata'>
+Title: Providing size feedback in the Allocator interface
+Status: D
+Shortname: P0401
+Group: WG21
+Revision: 6
+Editor: Jonathan Wakely, cxx@kayari.org
+Editor: Chris Kennelly, Google, ckennelly@google.com
+Date: 2021-01-22
+Audience: LWG
+Abstract: Utilize size feedback from Allocator to reduce spurious reallocations
+URL: https://wg21.link/P0401R6
+Markup Shorthands: markdown yes
+Default Highlight: C++
+</pre>
+
+# Introduction # {#intro}
+
+This is a library paper to describe how size feedback can be used with allocators:
+*   In the case of `std::allocator`, the language feature proposed in
+    [[P0901R5]] could be used.
+*   In the case of custom allocators, the availability of the traits  interface
+    allows standard library containers to leverage this functionality.
+
+# Motivation # {#motivation}
+
+Consider code adding elements to `vector`:
+
+<xmp>
+std::vector<int> v = {1, 2, 3};
+// Expected: v.capacity() == 3
+
+// Add an additional element, triggering a reallocation.
+v.push_back(4);
+</xmp>
+
+Many allocators only allocate in fixed-sized chunks of memory, rounding up
+requests.  Our underlying heap allocator received a request for 12 bytes (`3 *
+sizeof(int)`) while constructing `v`.  For several implementations, this request
+is turned into a 16 byte region.
+
+## Why not `realloc` ## {#reallocation}
+
+`realloc` poses several problems problems:
+
+*   We have unclear strategies for growing a container.  Consider the two
+    options (`a` and `b`) outlined in the comments of the example below.
+    Assume, as with the [[#motivation]] example, that there is a 16 byte size
+    class for our underlying allocator.
+
+    <xmp>
+    std::vector<int> v = {1, 2, 3};
+    // Expected: v.capacity() == 3
+
+    // Add an additional element.  Does the vector:
+    // a) realloc(sizeof(int) * 4), adding a single element
+    // b) realloc(sizeof(int) * 6), attempt to double, needing reallocation
+    v.push_back(4);
+
+    // Add another element.
+    // a) realloc(sizeof(int) * 5), fails in-place, requires reallocation
+    // b) size + 1 <= capacity, no reallocation required
+    v.push_back(5);
+    </xmp>
+
+    Option `a` requires every append (after the initial allocation) try to
+    `realloc`, requiring an interaction with the allocator each time.
+
+    Option `b` requires guesswork to probe the allocator's true size.  By
+    doubling (the typical growth pattern for `std::vector` in libc++ and
+    libstdc++), we skip past the existing allocation's size boundary.  While we
+    can use a reduced growth rate, doing so requires more interactions with the
+    allocator (calls to `realloc`), as well as copies (when we cannot resize
+    in-place).
+
+    Both of these options add extra branching on the control flow for growing
+    the buffer.
+
+*   When the allocator cannot resize the buffer in-place, it allocates new
+    memory and `memcpy`'s the contents.  For non-trivially copyable types, this
+    is disastrous.  The *language* lacks support for reallocating in-place
+    *without* moving.  While this function could be implemented as magic
+    library function, it could not interact with many underlying `malloc`
+    implementations (libc, in the case of libc++ and libstdc++) used to build
+    `operator new`, nor could it interact with user-provided replacement
+    functions.
+
+    In-place reallocation has been considered in [[N3495]] (throwing
+    `std::bad_alloc` when unable) and [[P0894R1]] (returning `false` when
+    unable).  This has sometimes been referred to as an "extend" or an "expand"
+    interface.  Extending an existing allocation requires a round-trip to the
+    allocator (and its requisite branch/call overheads) to determine whether
+    the allocation *could* be expanded.  As discussed previously, we need to
+    probe for the true size of the backing object (until we find extend fails)
+    until we give up and apply a multiplicative expansion factor.
+
+For fixed-size allocators it makes more sense, and is much simpler for
+containers to adapt to, if the allocator is able to over-allocate on the
+initial request and inform the caller how much memory was made available.
+
+## Why not ask the allocator for the size ## {#size}
+
+We could also explore APIs that answer the question: "If I ask for `N` bytes,
+how many do I actually get?"  [[jemalloc]] and [[TCMalloc]] call this
+`nallocx`.
+
+*   `nallocx` requires an extra call / size calculation.  This requires we
+    duplicate work, as the size calculation is performed as part of allocation
+    itself.
+*   `nallocx` impairs telemetry for monitoring allocation request sizes.  If a
+    `nallocx` return value is cached, the user appears to be asking for exactly
+    as many bytes as `nallocx` said they would get.
+
+See also [[P0901R5]]'s discussion "`nallocx`: not as awesome as it looks."
+
+# Proposal # {#proposal}
+
+Wording relative to [[N4868]].
+
+We propose a free function to return the allocation size simultaneously with an
+allocation.
+
+Amend [memory.syn]:
+
+<blockquote>
+<pre>
+namespace std {
+  // ... elided ...
+
+  // [allocator.traits], allocator traits
+  template&lt;class Alloc&gt; struct allocator_traits;
+
+  <ins>template&lt;class Pointer&gt;
+  struct allocation_result {
+    Pointer ptr;
+    size_t count;
+  };
+
+  template&lt;class Allocator&gt;
+  [[nodiscard] constexpr allocation_result&lt;typename allocator_traits&lt;Allocator&gt;::pointer&gt; allocate_at_least(
+    Allocator& a, size_t n);</ins>
+
+  // [default.allocator], the default allocator
+  template&lt;class T&gt; class allocator;
+  template&lt;class T, class U&gt;
+    constexpr bool operator==(const allocator&lt;T&gt;&amp;, const allocator&lt;U&gt;&amp;) noexcept;
+
+  // ... elided ...
+}
+</pre>
+</blockquote>
+
+Amend [allocator.traits.types] to ensure structured binding compatibility:
+
+<blockquote>
+<p>
+<ins>The class template `allocation_result` has the template parameters, data
+members, and special members specified above. It has no base classes or members
+other than those specified.</ins>
+</p>
+</blockquote>
+
+Insert [allocator.traits.other]:
+
+<blockquote>
+<pre>
+<ins>
+template&lt;class Allocator&gt;
+[[nodiscard]] constexpr allocation_result&lt;typename allocator_traits&lt;Allocator&gt;::pointer&gt;
+  allocate_at_least(Allocator& a, size_t n);
+</ins>
+</pre>
+
+<ul>
+<li><ins>*Returns:* `a.allocate_at_least(n)` if that expression is well-formed; otherwise, `{a.allocate(n), n}`.</ins>
+</ul>
+</blockquote>
+
+Amend [default.allocator.general]:
+
+<blockquote>
+<pre>
+namespace std {
+  template&lt;class T&gt; class allocator {
+   public:
+    using value_type                             = T;
+    using size_type                              = size_t;
+    using difference_type                        = ptrdiff_t;
+    using propagate_on_container_move_assignment = true_type;
+    using is_always_equal                        = true_type;
+
+    constexpr allocator() noexcept;
+    constexpr allocator(const allocator&amp;) noexcept;
+    template&lt;class U&gt; constexpr allocator(const allocator&lt;U&gt;&amp;) noexcept;
+    constexpr ~allocator();
+    constexpr allocator&amp; operator=(const allocator&amp;) = default;
+
+    [[nodiscard]] constexpr T* allocate(size_t n);
+    <ins>[[nodiscard]] constexpr allocation_result&lt;T*&gt; allocate_at_least(size_t n);</ins>
+    constexpr void deallocate(T* p, size_t n);
+  };
+}
+</pre>
+</blockquote>
+
+Amend [allocator.members]:
+
+<blockquote>
+<p>Except for the destructor, member functions of the default allocator shall
+not introduce data races as a result of concurrent calls to those member
+functions from different threads. Calls to these functions that allocate or
+deallocate a particular unit of storage shall occur in a single total order,
+and each such deallocation call shall happen before the next allocation (if
+any) in this order.</p>
+
+<pre>[[nodiscard]] constexpr T* allocate(size_t n);</pre>
+
+<ul>
+<li>*Mandates:* `T` is not an incomplete type ([basic.types]).</li>
+<li>*Returns:* A pointer to the initial element of an array of `n` `T`.</li>
+<li>*Throws:* `bad_array_new_length` if `numeric_limits<size_t>::max() / sizeof(T) < n`, or `bad_alloc` if the storage cannot be obtained.</li>
+<li>*Remarks:* The storage for the array is obtained by calling `::operator new`, but it is unspecified when or how often this function is called. This function starts the lifetime of the array object, but not that of any of the array elements.</li>
+</li>
+</ul>
+
+<pre><ins>[[nodiscard]] constexpr allocation_result&lt;T*&gt; allocate_at_least(size_t n);</ins></pre>
+
+<ul>
+<li><ins>*Mandates:* `T` is not an incomplete type ([basic.types]).</ins></li>
+<li><ins>*Returns:* `allocation_result<T*>{ptr, count}`, where `ptr` is a pointer to the initial element of an array of `count` `T` and `count >= n`.</ins></li>
+<li><ins>*Throws:* `bad_array_new_length` if `numeric_limits<size_t>::max() / sizeof(T) < n`, or `bad_alloc` if the storage cannot be obtained.</ins></li>
+<li><ins>*Remarks:* The storage for the array is obtained by calling `::operator new`, but it is unspecified when or how often this function is called. This function starts the lifetime of the array object, but not that of any of the array elements.</ins></li>
+</ul>
+
+<pre>constexpr void deallocate(T* p, size_t n);</pre>
+
+<ul>
+<li><del>*Preconditions:* `p` is a pointer value obtained from `allocate`. `n` equals the value passed as the first argument to the invocation of `allocate` which returned `p`.</del></li>
+<li><ins>*Preconditions:*</ins>
+  <ul>
+  <li><ins>If `p` is memory that was obtained by a call to `allocate_at_least`, let *ret* be the value returned and *req* be the value passed as the first argument to that call.  `p` is equal to `ret.ptr` and `n` is a value such that <math>*req* &le; n &le; *ret.count*</math>.</ins></li>
+  <li><ins>Otherwise, `p` is a pointer value obtained from `allocate`.  `n` equals the value passed as the first argument to the invocation of `allocate` which returned `p`.</ins></li>
+  </ul>
+</li>
+<li>*Effects:* Deallocates the storage referenced by `p`.</li>
+<li>*Remarks:* Uses `::operator delete`, but it is unspecified when this function is called.</li>
+</ul>
+</blockquote>
+
+Amend [allocator.requirements.general], [tab:cpp17.allocator].  The return type `X::pointer` is used in the table for consistency with `a.allocate` but should be resolved according to the <a href="https://lists.isocpp.org/lib/2020/11/18159.php">LWG issue</a>.
+
+<blockquote>
+
+<table>
+<tr>
+<td>`a.allocate(n)`</td>
+<td>`X::pointer`</td>
+<td>Memory is allocated for an array of `n` `T` and such an object is created but array elements are not constructed.
+
+[*Example 1*: When reusing storage denoted by some pointer value `p`, `launder(reinterpret_­cast<T*>(new (p) byte[n * sizeof(T)]))` can be used to implicitly create a suitable array object and obtain a pointer to it. — *end example*]
+
+`allocate` may throw an appropriate exception.
+
+<del>[*Note 1*: If n == 0, the return value is unspecified. — *end note*]</del>
+<ins>See Note C, below.</ins>
+</td>
+<td></td>
+</tr>
+
+<tr>
+<td>`a.allocate(n, y)`</td>
+<td>`X::pointer`</td>
+<td>Same as `a.allocate(n)`.  The use of `y` is unspecified, but it is intended as an aid to locality.</td>
+<td>`a.allocate(n)`</td>
+</tr>
+
+<tr>
+<td><ins>`a.allocate_at_least(n)`</ins></td>
+<td><ins>`allocation_result<X::pointer>`</ins></td>
+<td>
+<ins>*Returns*: `allocation_result<X::pointer>{ptr, count}` where `ptr` is memory allocated for an array of `count` `T` and such an object is created but array elements are not constructed, such that `count >= n`.  `allocate_at_least` may throw an appropriate exception. See Note C, below.</ins>
+</td>
+<td><ins>See Note D, below.</ins></td>
+</tr>
+
+<tr>
+<td>`a.deallocate(p,n)`</td>
+<td>(not used)</td>
+<td><ul>
+<li><del>*Preconditions:* `p` is a value returned by an earlier call to `allocate` that has not been invalidated by an intervening call to `deallocate`. `n` matches the value passed to `allocate` to obtain this memory.</del></li>
+<li><ins>*Preconditions:*</ins>
+  <ul>
+  <li><ins>If `p` is memory that was obtained by a call to `a.allocate_at_least`, let *ret* be the value returned and *req* be the value passed as the first argument of that call.  `p` is equal to `ret.ptr` and `n` is a value such that <math>*req* &le; n &le; *ret.count*</math>.</ins></li>
+  <li><ins>Otherwise, `p` is a pointer value obtained from `allocate`.  `n` equals the value passed as the first argument to the invocation of `allocate` which returned `p`.</ins></li>
+  </ul>
+
+  <ins>`p` has not been invalidated by an intervening call to `deallocate`.</ins>
+</li>
+<li>*Throws*: Nothing.</li>
+</ul>
+</td>
+<td></td>
+</tr>
+</table>
+
+... elided ...
+
+<p><ins>Note C:  If `n == 0`, the return value is unspecified.</ins></p>
+
+<p><ins>Note D:  An allocator need not support `allocate_at_least`, but no default is provided in `allocator_traits`.  If an allocator has an `allocate_at_least` member, it shall satisify the requirements.</ins></p>
+</blockquote>
+
+Amend [version.syn]
+
+<blockquote>
+<pre>
+<ins>#define __cpp_lib_allocate_at_least PLACEHOLDER // also in &lt;memory&gt;</ins>
+</pre>
+</blockquote>
+
+# Design Considerations # {#design}
+
+## `allocate` selection ## {#overloads}
+
+There are multiple approaches here:
+
+*   Return a pointer-size pair, as presented.
+*   Overload `allocate` and return via a reference parameter.  This potentially
+    hampers optimization depending on ABI, as the value is returned via memory
+    rather than a register.
+
+## Size Return Value ## {#returnvalue}
+
+In [[Prague]], LEWG discussed the return value.  For compatibility with the
+existing allocator APIs, which work in units of *objects* rather than bytes,
+this proposal chooses to continue to return an integer number of objects.
+
+Additionally, for types with non-trivial alignment requirements, we must
+allocate storage for objects, rather than bytes, as raw bytes do not convey the
+appropriate alignment needs to the allocator.
+
+For example:  In the `std::vector<T>` case, many implementations use 3 pointers
+for representing the state of the container (begin, end, and capacity).  If we
+preserved the precise value returned by the underlying allocator, we may not be
+able to legally form the capacity pointer.  For these implementations,
+replacing the capacity pointer with a capacity in bytes would be an ABI break.
+
+## `deallocate` changes ## {#deallocate}
+
+We now require flexibility on the size we pass to `deallocate`.  For container
+types using this allocator interface, they are faced with the choice of storing
+*both* the original size request as well as the provided size (requiring
+additional auxillary storage), or being unable to reproduce one during the call
+to `deallocate`.
+
+As the true size is expected to be useful for the `capacity` of a `string` or
+`vector` instance, the returned size is available without additional storage
+requirements.  The original (requested) size is unavailable, so we relax the
+`deallocate` size parameter requirements for these allocations.
+
+In [[P0901R5]], we anticipate use cases where the user does not store enough
+information about the size to return a precise, byte-level count.  We may be
+allocating `T`'s and receive enough storage to allocate 3.5 objects.  Requiring
+callers return the precise size may be impractical (`std::vector` frequently
+stores its capacity as a `T*`) without additionally auxillary storage.
+
+In this paper, we may be similarly unable to return the true size back.  In the
+[[Prague]] review of this paper, we discussed cases where we rounded down to
+the multiple of the size being allocated.  Alternatively, custom data
+structures may use `allocator` to obtain storage, but quantize that.  In
+Abseil's [[Cord]], data is stored in chunks with a length-encoding tag at the
+start of each chunk.  These tags quantize the capacity in `AllocatedSizeToTag`
+that can be represented to multiples of 16- and 32-bytes.  This makes the
+encoded length more compact, but means we cannot reproduce the size the
+allocator provided us precisely.
+
+## Interaction with `polymorphic_allocator` ## {#pmr}
+
+`std::pmr::memory_resource` is implemented using virtual functions.  Adding new
+methods, such as the proposed allocate API would require taking an ABI break.
+
+## Zero-Sized Requests ## {#zero}
+
+In Prague, LEWG discussed the behavior of `allocate_at_least(allocator, 0)`.
+This maximizes implementation freedom.
+
+*   The return value may not be dereferenceable (even if not `nullptr`).
+*   Other implementations, such as a stack allocator, could just return the
+    current offset.
+
+# Revision History # {#revisions}
+
+## R5 &rarr; R6 ## {#R6}
+
+Applied wording feedback from the reflector.
+
+   * In [memory.syn] added missing template parameter and `[[nodiscard]]`.
+   * In [memory.traits.other] added missing template parameter.
+   * In [allocator.members]:
+       * Removed `a.`.
+       * Clarified `req` is the value of the argument to the call.
+       * Used math operators, not C++ operators.
+   * Removed unneeded parentheses around `allocate`.
+   * Fixed wording in [tab:cpp17.allocator].
+   * Inserted line break between "Note C" and "Note D".
+   * Changed "note D" from must to shall.
+
+## R4 &rarr; R5 ## {#R5}
+
+Applied wording feedback from [[LWGNovTelecon]].
+
+   * Generally, replaced `typename T` with `class T`
+   * In [allocator.traits], removed change as redundant with [memory.syn]
+   * In [allocator.traits.type]:
+
+     * Fixed insert editing on [allocator.traits.type]
+     * Added note (in paper) for structured binding intent of [allocator.traits.type] wording
+
+   * In [allocator.traits.other]
+
+     * Moved `allocate_at_least` to new stable heading, as it is not a member of `allocator_traits`
+     * Fixed otherwise clause of `allocate_at_least`
+     * Added `[[nodiscard]]` to `allocate_at_least`
+
+   * In [allocator.members], applied math font in `deallocate` edits
+   * In [allocator.members], removed shall in `deallocate`
+   * In [allocator.members], applied code font to `allocate` calls
+   * In [allocator.members], removed structured binding in `deallocate` text
+   * In [allocator.members], bulleted cases for clarity.
+   * In [allocator.requirements.general]
+
+      * Moved *Note 1* from `allocate` to be "Note C" shared with `allocate_at_least`
+      * Moved "Note C" to "Note D" in the defaults column.
+      * Removed value from return type for `allocate_at_least`
+      * Added what `allocate_at_least` actually returns in third column
+      * Removed `std::` qualification from (now) "Note D"
+      * Removed definition of `allocate_at_least` (the helper) in (now) "Note D" rather than redefining it.
+      * Applied modifications from [allocator.members] `deallocate` to table.
+      * Required that if a `allocate_at_least` member is provided, it must meet the requirements.
+
+## R3 &rarr; R4 ## {#R4}
+
+*   Applied wording feedback from Pablo Halpern and David Stone
+*   Added discussion about changes to deallocation
+*   Proposed feature test macro
+
+## R2 &rarr; R3 ## {#R3}
+
+Applied LEWG feedback from [[Prague]].
+
+*   Renamed `sized_ptr_t` to `allocation_result`, based on discussion in Prague
+    that this library proposal (which returns a *count* of storage for objects)
+    have a distinct type from the underlying language proposal ([[P0901R5]],
+    which returns bytes).  This was one of the names bikeshedded during the
+    review of P0901R5 ([[P0901R5-Review]]).
+*   Renamed `n` (the returned size) to `count`, based on discussion in Prague
+    to clarify that is measured in objects, rather than bytes.  Additionally,
+    augmented discussion of the `deallocate` changes for why implementations
+    may not be able to preserve the precise size returned by the underlying
+    allocator.
+
+<blockquote>
+Poll: We prefer to return number of bytes.
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>0</td><td>0</td><td>6</td><td>6</td><td>5</td></tr>
+</table>
+</blockquote>
+
+*   Changed the template parameter to pointer type to allow for fancy pointers.
+
+<blockquote>
+POLL: Change the template parameter to sized_ptr_t to pointer type (to support fancy ptr).
+
+Unanimous consent
+</blockquote>
+
+*    Added design intent and wording that `allocation_result` be compatible
+     with structured bindings.  This wording was adapted from the proposed
+     resolution of [[LWG3373]].
+*    Added `constexpr`
+*    Removed default template parameter from `allocation_result`
+*    Based on LEWG feedback, changed `allocate_at_least` to deduce return type
+     from the allocator.  Since the pointer type is chosen by the allocator,
+     the underlying object type is less relevant.  This also removed the
+     default template parameter.
+
+<blockquote>
+POLL: We want to deduce the object type from the allocator (alloc_least_n [sic]).
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>4</td><td>8</td><td>1</td><td>0</td><td>0</td></tr>
+</table>
+</blockquote>
+
+<blockquote>
+POLL: We like the design, please revise and do initial wording review (with
+Pablo, and David Stone) send to LWG (tentatively Ready).
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>6</td><td>12</td><td>0</td><td>0</td><td>0</td></tr>
+</table>
+</blockquote>
+
+## R1 &rarr; R2 ## {#R2}
+
+Applied LEWG feedback from [[Cologne]].
+
+<blockquote>
+Poll: We want a feature like this.
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>2</td><td>9</td><td>2</td><td>0</td><td>0</td></tr>
+</table>
+</blockquote>
+
+*   As users may specialize `std::allocator_traits`, this revision moves to a
+    free function `std::allocate_at_least` as suggested via a LEWG poll.
+
+<blockquote>
+Poll: Name choice
+
+<table>
+<tr><td> 5</td><td>`allocate_with_size`</td></tr>
+<tr><td> 4</td><td>`overallocate`</td></tr>
+<tr><td> 2</td><td>`allocate_with_oversubscribe`</td></tr>
+<tr><td> 6</td><td>`allocate_oversize`</td></tr>
+<tr><td>14</td><td>`allocate_at_least`</td></tr>
+</table>
+
+Poll: Prefer a struct rather than a requirement of structured bindings.
+
+<table>
+<tr><th>SF</th><th>F</th><th>N</th><th>A</th><th>SA</th></tr>
+<tr><td>2</td><td>8</td><td>0</td><td>2</td><td>1</td></tr>
+</table>
+</blockquote>
+
+<pre class=biblio>
+{
+    "Cologne": {
+        "href": "http://wiki.edg.com/bin/view/Wg21cologne2019/P0401",
+	"date": "2019-07-17",
+	"title": "Cologne Meeting Minutes"
+    },
+    "Cord": {
+	"href": "https://github.com/abseil/abseil-cpp/blob/master/absl/strings/cord.h",
+	"title": "absl::Cord"
+    },
+    "P0894R1": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0894r1.md",
+	"date": "2019-01-18",
+	"title": "realloc for C++"
+    },
+    "P0901R5": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0901r5.html",
+	"date": "2019-10-03",
+	"title": "Size feedback in operator new"
+    },
+    "P0901R5-Review": {
+        "href": "http://wiki.edg.com/bin/view/Wg21prague/P0901",
+	"date": "2020-02-10",
+	"title": "P0901R5 LEWG Review Prague"
+    },
+    "N4800": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4800.pdf",
+	"date": "2019-01-21",
+	"title": "Working Draft, Standard for Programming Language C++"
+    },
+    "N4868": {
+        "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/n4868.pdf",
+	"date": "2020-10-18",
+	"title": "Working Draft, Standard for Programming Language C++"
+    },
+    "Prague": {
+        "href": "http://wiki.edg.com/bin/view/Wg21prague/P0401",
+	"date": "2020-02-14",
+	"title": "P0401R2 LEWG Review Prague"
+    },
+    "jemalloc": {
+        "title": "jemalloc(3) - Linux man page",
+        "href": "http://jemalloc.net/jemalloc.3.html"
+    },
+    "LWG3373": {
+        "title": "{to,from}_chars_result and format_to_n_result need the 'we really mean what we say' wording",
+        "href": "https://cplusplus.github.io/LWG/lwg-active.html#3373"
+    },
+    "LWGNovTelecon": {
+        "title": "November 2020 LWG Review",
+	"href": "https://wiki.edg.com/bin/view/Wg21fall2020/P0401R4-2020-11-20"
+    },
+    "TCMalloc": {
+        "href": "https://github.com/google/tcmalloc",
+        "title": "TCMalloc"
+    }
+}
+</pre>
